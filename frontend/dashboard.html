@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard | Smart Test Management System</title>
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Global UI -->
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <h2>Smart Test Management System</h2>
+    <div class="user">
+      <span id="staffName">Welcome</span>
+      <button onclick="logout()">Logout</button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="container">
+
+    <h3 id="roleTitle" class="muted"></h3>
+
+    <!-- ACTION CARDS -->
+    <div class="cards">
+
+      <!-- STAFF + ADMIN -->
+      <div class="card" onclick="goToCreateTest()">
+        <h3>Create Test</h3>
+        <p class="muted">Design exams with security rules</p>
+      </div>
+
+      <div class="card" onclick="goToManageTests()">
+        <h3>Manage Tests</h3>
+        <p class="muted">View, delete and monitor tests</p>
+      </div>
+
+      <div class="card" onclick="goToResults()">
+        <h3>View Results</h3>
+        <p class="muted">Analyze student performance</p>
+      </div>
+
+      <!-- ADMIN ONLY -->
+      <div class="card admin-only" onclick="goCreateStaff()">
+        <h3>Create Staff</h3>
+        <p class="muted">Add new staff accounts</p>
+      </div>
+
+      <div class="card admin-only" onclick="goManageStaff()">
+        <h3>Manage Staff</h3>
+        <p class="muted">View or remove staff accounts</p>
+      </div>
+
+    </div>
+
+    <br>
+
+    <!-- SECURITY CONTROLS (UI DISPLAY ONLY) -->
+    <section class="security">
+      <h3>Security Controls</h3>
+
+      <label>
+        <input type="checkbox" checked disabled>
+        Enforce Fullscreen Mode
+      </label><br>
+
+      <label>
+        <input type="checkbox" checked disabled>
+        Disable Copy / Paste
+      </label><br>
+
+      <label>
+        <input type="checkbox" disabled>
+        Auto-submit on Tab Switch
+      </label>
+    </section>
+
+    <br>
+
+    <!-- RECENT ACTIVITY -->
+    <section class="activity">
+      <h3>Recent Activity</h3>
+      <ul id="activityLog" class="muted">
+        <li>No recent activity</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <!-- Scripts -->
+  <script src="ui.js"></script>
+  <script src="dashboard.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Create Test</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="create-test.css">
+</head>
+
+<body>
+
+<header class="header">
+  <h2>Create New Test</h2>
+  <button class="secondary" onclick="goBack()">⬅ Dashboard</button>
+</header>
+
+<main class="container">
+
+  <!-- BASIC DETAILS -->
+  <section>
+    <h3>Test Details</h3>
+    <input id="title" placeholder="Test Title">
+    <input id="password" placeholder="Test Password">
+    <input id="duration" type="number" placeholder="Duration (minutes)">
+  </section>
+
+  <br>
+
+  <!-- SETTINGS -->
+  <section>
+    <h3>Exam Settings</h3>
+
+    <label>
+      <input type="checkbox" id="shuffleQ" checked>
+      Shuffle Questions
+    </label><br>
+
+    <label>
+      <input type="checkbox" id="shuffleA" checked>
+      Shuffle Answers
+    </label>
+  </section>
+
+  <br>
+
+  <!-- SECURITY -->
+  <section>
+    <h3>Security Rules</h3>
+
+    <label>
+      <input type="checkbox" id="fullscreen" checked>
+      Enforce Fullscreen
+    </label><br>
+
+    <label>
+      <input type="checkbox" id="disableCopy" checked>
+      Disable Copy / Paste
+    </label><br>
+
+    <label>
+      <input type="checkbox" id="autoSubmitTab">
+      Auto Submit on Tab Switch
+    </label>
+  </section>
+
+  <br>
+
+  <!-- QUESTIONS -->
+  <section>
+    <h3>Questions</h3>
+    <div id="questions"></div>
+
+    <button onclick="addQuestion()">➕ Add Question</button>
+  </section>
+
+  <br>
+
+  <!-- ACTION -->
+  <button onclick="saveTest()">💾 Save Test</button>
+
+</main>
+
+<script src="create-test.js"></script>
+</body>
+</html>

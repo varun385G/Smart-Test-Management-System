@@ -1,0 +1,24 @@
+body { font-family: Arial; background: #f4f6f8; }
+
+.header {
+  background: #1e88e5;
+  color: white;
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+}
+
+table {
+  width: 100%;
+  background: white;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 10px;
+  border: 1px solid #ddd;
+}
+
+button {
+  margin-right: 5px;
+}

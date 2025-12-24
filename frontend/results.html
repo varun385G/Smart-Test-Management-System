@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="ui.css">
+
+  <title>Results</title>
+  <link rel="stylesheet" href="results.css">
+</head>
+<body>
+
+<h2>Test Results</h2>
+
+<input id="testId" placeholder="Enter Test ID">
+<button onclick="loadResults()">View</button>
+
+<table>
+  <thead>
+    <tr>
+      <th>Student</th>
+      <th>Reg No</th>
+      <th>Score</th>
+      <th>Time</th>
+    </tr>
+  </thead>
+  <tbody id="results"></tbody>
+</table>
+
+<script src="results.js"></script>
+</body>
+</html>

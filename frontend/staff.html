@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="ui.css">
+
+  <title>Staff Login</title>
+</head>
+<body>
+
+<h2>Staff Login</h2>
+
+<input id="email" type="email" placeholder="Email"><br><br>
+<input id="password" type="password" placeholder="Password"><br><br>
+
+<button onclick="login()">Login</button>
+
+<p id="msg" style="color:red;"></p>
+
+<script>
+async function login() {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  if (!email || !password) {
+    document.getElementById("msg").innerText = "Please enter email and password";
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/staff/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      document.getElementById("msg").innerText = data.message;
+      return;
+    }
+
+ // Save login info
+localStorage.setItem("staffId", data.staffId);
+localStorage.setItem("staffName", data.name);
+localStorage.setItem("role", data.role);
+
+// Everyone goes to SAME dashboard
+window.location.href = "/dashboard.html";
+
+
+  } catch (e) {
+    console.error(e);
+    document.getElementById("msg").innerText = "Server error. Try again.";
+  }
+}
+</script>
+
+</body>
+</html>

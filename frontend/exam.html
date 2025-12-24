@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Online Exam</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="theme.css">
+
+  <style>
+    .exam-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #111827;
+      color: white;
+      padding: 16px;
+    }
+
+    #timer {
+      font-size: 18px;
+      font-weight: bold;
+      background: #ef4444;
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+
+    .question {
+      background: white;
+      padding: 16px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+
+    .question label {
+      display: block;
+      margin: 6px 0;
+    }
+
+    .submit-btn {
+      background: #16a34a;
+      font-size: 16px;
+      padding: 10px 18px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- EXAM HEADER -->
+<div class="exam-header">
+  <h3 id="testTitle">Exam</h3>
+  <div id="timer">00:00</div>
+</div>
+
+<main class="container">
+
+  <div id="questions"></div>
+
+  <button class="submit-btn" onclick="submitExam()">Submit Exam</button>
+
+</main>
+
+<script>
+  // Anti-cheating (UI-level)
+  document.addEventListener("contextmenu", e => e.preventDefault());
+  document.addEventListener("copy", e => e.preventDefault());
+  document.addEventListener("paste", e => e.preventDefault());
+</script>
+
+<script src="exam.js"></script>
+
+</body>
+</html>

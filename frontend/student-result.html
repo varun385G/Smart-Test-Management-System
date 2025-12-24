@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="ui.css">
+
+  <title>Your Result</title>
+</head>
+<body>
+
+<h2>Your Result</h2>
+
+<div id="result"></div>
+
+<script src="student-result.js"></script>
+</body>
+</html>
+<br><br>
+<button onclick="goHome()">Go to Student Home</button>
+
+<script>
+function goHome() {
+  localStorage.removeItem("testId");
+  localStorage.removeItem("attempted");
+  window.location.href = "/student";
+}
+</script>

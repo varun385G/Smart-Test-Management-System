@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Smart Test Management System</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="theme.css">
+
+  <style>
+    .hero {
+      text-align: center;
+      padding: 80px 20px;
+      background: linear-gradient(135deg, #1f2937, #111827);
+      color: white;
+    }
+
+    .hero h1 {
+      font-size: 36px;
+      margin-bottom: 10px;
+    }
+
+    .hero p {
+      font-size: 18px;
+      opacity: 0.85;
+    }
+
+    .hero .buttons {
+      margin-top: 30px;
+    }
+
+    .hero button {
+      margin: 8px;
+      font-size: 16px;
+      padding: 12px 24px;
+    }
+
+    .features {
+      padding: 40px 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+    }
+
+    .feature {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="hero">
+  <h1>Smart Test Management System</h1>
+  <p>Secure • Scalable • Smart Online Examination Platform</p>
+
+  <div class="buttons">
+    <button onclick="location.href='/staff'">Staff Login</button>
+    <button class="secondary" onclick="location.href='/student'">Student Access</button>
+  </div>
+</div>
+
+<div class="features">
+  <div class="feature">
+    <h3>Secure Exams</h3>
+    <p>Fullscreen enforcement, copy-paste prevention, auto-submit on tab switch.</p>
+  </div>
+
+  <div class="feature">
+    <h3>Role-Based Access</h3>
+    <p>Admin, Staff and Student dashboards with controlled permissions.</p>
+  </div>
+
+  <div class="feature">
+    <h3>Real-Time Analytics</h3>
+    <p>Instant result processing and performance tracking.</p>
+  </div>
+
+  <div class="feature">
+    <h3>Scalable System</h3>
+    <p>Supports multiple staff, tests, and concurrent students.</p>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="ui.css">
+
+  <meta charset="UTF-8">
+  <title>Manage Tests</title>
+  <link rel="stylesheet" href="manage-tests.css">
+</head>
+<body>
+
+<header class="header">
+  <h2>Manage Tests</h2>
+  <button onclick="goBack()">⬅ Dashboard</button>
+</header>
+
+<div class="container">
+  <table>
+    <thead>
+      <tr>
+        <th>Test ID</th>
+        <th>Title</th>
+        <th>Created</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="testList"></tbody>
+  </table>
+</div>
+
+<script src="manage-tests.js"></script>
+</body>
+</html>

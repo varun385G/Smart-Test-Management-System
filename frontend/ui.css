@@ -1,0 +1,107 @@
+/* ===== GLOBAL THEME ===== */
+* {
+  box-sizing: border-box;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f4f6f9;
+  color: #333;
+}
+
+/* ===== HEADER ===== */
+.header {
+  background: #1f2937;
+  color: #fff;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.header button {
+  background: #ef4444;
+  border: none;
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* ===== CONTAINER ===== */
+.container {
+  padding: 24px;
+}
+
+/* ===== CARDS ===== */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  cursor: pointer;
+  transition: 0.2s;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+}
+
+/* ===== BUTTONS ===== */
+button {
+  background: #2563eb;
+  border: none;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #6b7280;
+}
+
+/* ===== TABLE ===== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+th, td {
+  padding: 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+th {
+  background: #f1f5f9;
+  text-align: left;
+}
+
+/* ===== INPUTS ===== */
+input {
+  padding: 8px;
+  margin: 6px 0;
+  width: 100%;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+}
+
+/* ===== FOOTER TEXT ===== */
+.muted {
+  color: #6b7280;
+  font-size: 14px;
+}
