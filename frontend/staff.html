@@ -1,12 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css">
-<link rel="stylesheet" href="ui.css">
-
+  <meta charset="UTF-8">
   <title>Staff Login</title>
+
+  <!-- ✅ KEEP ORIGINAL UI -->
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="responsive.css">
+<link rel="stylesheet" href="app.css">
+
 </head>
+
 <body>
 
 <h2>Staff Login</h2>
@@ -22,9 +27,12 @@
 async function login() {
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value.trim();
+  const msg = document.getElementById("msg");
+
+  msg.innerText = "";
 
   if (!email || !password) {
-    document.getElementById("msg").innerText = "Please enter email and password";
+    msg.innerText = "Please enter email and password";
     return;
   }
 
@@ -38,22 +46,21 @@ async function login() {
     const data = await res.json();
 
     if (!res.ok) {
-      document.getElementById("msg").innerText = data.message;
+      msg.innerText = data.message || "Login failed";
       return;
     }
 
- // Save login info
-localStorage.setItem("staffId", data.staffId);
-localStorage.setItem("staffName", data.name);
-localStorage.setItem("role", data.role);
+    // ✅ STORE CORRECT KEYS
+    localStorage.setItem("staffId", data.staffId);
+    localStorage.setItem("staffName", data.name);
+    localStorage.setItem("staffRole", data.role);
 
-// Everyone goes to SAME dashboard
-window.location.href = "/dashboard.html";
+    // ✅ SAME DASHBOARD AS BEFORE
+    window.location.href = "/dashboard.html";
 
-
-  } catch (e) {
-    console.error(e);
-    document.getElementById("msg").innerText = "Server error. Try again.";
+  } catch (err) {
+    console.error(err);
+    msg.innerText = "Server error. Try again.";
   }
 }
 </script>

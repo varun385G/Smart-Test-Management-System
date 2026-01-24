@@ -1,102 +1,59 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Dashboard | Smart Test Management System</title>
+  <meta charset="UTF-8" />
+  <title>Dashboard</title>
 
-  <!-- Google Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-
-  <!-- Global UI -->
-  <link rel="stylesheet" href="ui.css">
+  <!-- GLOBAL UI -->
   <link rel="stylesheet" href="theme.css">
-  <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="responsive.css">
+  <link rel="stylesheet" href="app.css">
 </head>
 
 <body>
 
-  <!-- HEADER -->
+  <!-- ===== HEADER ===== -->
   <header class="header">
-    <h2>Smart Test Management System</h2>
-    <div class="user">
-      <span id="staffName">Welcome</span>
-      <button onclick="logout()">Logout</button>
-    </div>
+    <h2 id="staffName">Welcome</h2>
+    <button class="secondary" onclick="logout()">Logout</button>
   </header>
 
-  <!-- MAIN CONTENT -->
+  <!-- ===== MAIN ===== -->
   <main class="container">
 
-    <h3 id="roleTitle" class="muted"></h3>
-
-    <!-- ACTION CARDS -->
-    <div class="cards">
-
-      <!-- STAFF + ADMIN -->
-      <div class="card" onclick="goToCreateTest()">
-        <h3>Create Test</h3>
-        <p class="muted">Design exams with security rules</p>
-      </div>
-
-      <div class="card" onclick="goToManageTests()">
-        <h3>Manage Tests</h3>
-        <p class="muted">View, delete and monitor tests</p>
-      </div>
-
-      <div class="card" onclick="goToResults()">
-        <h3>View Results</h3>
-        <p class="muted">Analyze student performance</p>
-      </div>
-
-      <!-- ADMIN ONLY -->
-      <div class="card admin-only" onclick="goCreateStaff()">
-        <h3>Create Staff</h3>
-        <p class="muted">Add new staff accounts</p>
-      </div>
-
-      <div class="card admin-only" onclick="goManageStaff()">
-        <h3>Manage Staff</h3>
-        <p class="muted">View or remove staff accounts</p>
-      </div>
-
+    <!-- ADMIN CONTROLS -->
+    <div class="card admin-only">
+      <h3>Admin Controls</h3>
+      <p class="muted">Staff & system management</p>
+      <br>
+      <button onclick="goCreateStaff()">Create Staff</button>
+      <button onclick="goManageStaff()">Manage Staff</button>
     </div>
 
     <br>
 
-    <!-- SECURITY CONTROLS (UI DISPLAY ONLY) -->
-    <section class="security">
-      <h3>Security Controls</h3>
-
-      <label>
-        <input type="checkbox" checked disabled>
-        Enforce Fullscreen Mode
-      </label><br>
-
-      <label>
-        <input type="checkbox" checked disabled>
-        Disable Copy / Paste
-      </label><br>
-
-      <label>
-        <input type="checkbox" disabled>
-        Auto-submit on Tab Switch
-      </label>
-    </section>
+    <!-- TEST MANAGEMENT -->
+    <div class="card">
+      <h3>Test Management</h3>
+      <p class="muted">Create, manage and evaluate tests</p>
+      <br>
+      <button onclick="goToCreateTest()">Create Test</button>
+      <button onclick="goToManageTests()">Manage Tests</button>
+      <button onclick="goToResults()">View Results</button>
+    </div>
 
     <br>
 
     <!-- RECENT ACTIVITY -->
-    <section class="activity">
+    <div class="card activity">
       <h3>Recent Activity</h3>
-      <ul id="activityLog" class="muted">
-        <li>No recent activity</li>
-      </ul>
-    </section>
+      <ul class="muted"></ul>
+    </div>
 
   </main>
 
-  <!-- Scripts -->
-  <script src="ui.js"></script>
+  <!-- SCRIPT -->
   <script src="dashboard.js"></script>
 
 </body>

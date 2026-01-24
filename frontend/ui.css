@@ -105,3 +105,15 @@ input {
   color: #6b7280;
   font-size: 14px;
 }
+.question {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.question:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+button {
+  transition: background 0.3s ease;
+}

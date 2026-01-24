@@ -1,8 +1,8 @@
-const role = localStorage.getItem("role");
+const role = localStorage.getItem("staffRole");
 
 if (role !== "admin") {
   alert("Access denied");
-  window.location.href = "/staff";
+  window.location.href = "/staff.html";
 }
 
 async function createStaff() {

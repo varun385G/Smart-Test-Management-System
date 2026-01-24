@@ -1,10 +1,12 @@
-const role = localStorage.getItem("role");
+// ✅ FIXED: correct key
+const role = localStorage.getItem("staffRole");
 
 if (role !== "admin") {
   alert("Access denied");
-  window.location.href = "/staff";
+  window.location.href = "/staff.html";
 }
 
+// Store fetched data
 let dataStore = {};
 
 // ================= LOAD STAFF =================
@@ -12,7 +14,6 @@ async function loadStaff() {
   const res = await fetch("/api/admin/results/grouped");
   dataStore = await res.json();
 
-  // Reset other views
   document.getElementById("testView").innerHTML = "";
   document.getElementById("studentView").innerHTML = "";
 
@@ -26,7 +27,7 @@ async function loadStaff() {
 
   Object.keys(dataStore).forEach(staffId => {
     const btn = document.createElement("button");
-    btn.innerText = dataStore[staffId].staffName || "Unknown Staff";
+    btn.innerText = dataStore[staffId].staffName;
     btn.onclick = () => loadTests(staffId);
     staffDiv.appendChild(btn);
     staffDiv.appendChild(document.createElement("br"));
@@ -56,7 +57,7 @@ function loadTests(staffId) {
   });
 }
 
-// ================= LOAD STUDENT RESULTS =================
+// ================= LOAD STUDENTS =================
 function loadStudents(results) {
   const div = document.getElementById("studentView");
 
@@ -79,7 +80,7 @@ function loadStudents(results) {
           <td>${r.studentName}</td>
           <td>${r.studentReg}</td>
           <td>${r.score}/${r.total}</td>
-          <td>${r.date ? new Date(r.date).toLocaleString() : "N/A"}</td>
+          <td>${new Date(r.date).toLocaleString()}</td>
         </tr>
       `).join("")}
     </table>

@@ -1,77 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Online Exam</title>
 
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="responsive.css">
+<link rel="stylesheet" href="app.css">
 
   <style>
-    .exam-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #111827;
-      color: white;
-      padding: 16px;
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
     }
 
-    #timer {
-      font-size: 18px;
+    header {
+      position: sticky;
+      top: 0;
+      background: #fff;
+      padding: 12px;
+      text-align: center;
       font-weight: bold;
-      background: #ef4444;
-      padding: 6px 12px;
-      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      z-index: 10;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      padding: 16px;
     }
 
     .question {
       background: white;
       padding: 16px;
-      border-radius: 10px;
-      margin-bottom: 16px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      margin-bottom: 12px;
+      border-radius: 6px;
     }
 
-    .question label {
-      display: block;
-      margin: 6px 0;
+    .option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* text left, radio right */
+  gap: 12px;
+  margin: 10px 0;
+  cursor: pointer;
+}
+
+.option span {
+  flex: 1;
+  text-align: left;
+}
+
+.option input[type="radio"] {
+  margin: 0;
+}
+
+
+    .option input[type="radio"] {
+      margin: 0;
+      transform: translateY(1px);
     }
 
-    .submit-btn {
-      background: #16a34a;
+    button {
+      width: 100%;
+      padding: 14px;
       font-size: 16px;
-      padding: 10px 18px;
-      margin-top: 20px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 6px;
+      margin: 16px 0;
+    }
+
+    button:hover {
+      background: #0056b3;
     }
   </style>
 </head>
 
 <body>
 
-<!-- EXAM HEADER -->
-<div class="exam-header">
-  <h3 id="testTitle">Exam</h3>
-  <div id="timer">00:00</div>
+<header>
+  <div>Online Examination</div>
+  <div id="timer" style="color:red;">Time: --:--</div>
+</header>
+
+<div class="container" id="examContainer">
+  <p id="loadingText">Loading exam… Please wait</p>
 </div>
 
-<main class="container">
-
-  <div id="questions"></div>
-
-  <button class="submit-btn" onclick="submitExam()">Submit Exam</button>
-
-</main>
-
-<script>
-  // Anti-cheating (UI-level)
-  document.addEventListener("contextmenu", e => e.preventDefault());
-  document.addEventListener("copy", e => e.preventDefault());
-  document.addEventListener("paste", e => e.preventDefault());
-</script>
+<button onclick="submitExam()">Submit Exam</button>
 
 <script src="exam.js"></script>
-
 </body>
 </html>

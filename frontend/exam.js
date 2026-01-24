@@ -1,157 +1,191 @@
-console.log("exam.js loaded");
+// ================= BASIC DATA =================
+let violationCount = 0;
+const MAX_VIOLATIONS = 3;
 
-// ================= BASIC CHECK =================
+let remainingSeconds = 0;
+let timerInterval = null;
+let examSubmitted = false;
+
 const testId = localStorage.getItem("testId");
+const studentName = localStorage.getItem("studentName");
+const studentReg = localStorage.getItem("studentReg");
 
-if (!testId) {
-  alert("No test selected");
-  window.location.href = "/student";
+let questions = [];
+let answers = [];
+
+// ================= SAFETY CHECK =================
+if (!testId || !studentReg) {
+  alert("Invalid exam session. Please re-enter the test.");
+  window.location.href = "/student.html";
 }
 
-// ================= TIMER =================
-let timerInterval;
-let timeLeft = 0;
+// ================= SECURITY =================
+function registerViolation(reason) {
+  if (examSubmitted) return;
 
-function startTimer(minutes) {
-  timeLeft = minutes * 60;
-  const timerEl = document.getElementById("timer");
+  violationCount++;
+
+  alert(`Warning ${violationCount}/${MAX_VIOLATIONS}\n${reason}`);
+
+  // Log violation (optional backend)
+  fetch("/api/exam/violation", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ testId, studentReg, reason, count: violationCount })
+  }).catch(() => {});
+
+  if (violationCount >= MAX_VIOLATIONS) {
+    autoSubmit("Multiple violations detected");
+  }
+}
+
+// ================= FULLSCREEN =================
+function enterFullscreen() {
+  const el = document.documentElement;
+  if (el.requestFullscreen && !document.fullscreenElement) {
+    el.requestFullscreen().catch(() => {});
+  }
+}
+
+let fullscreenInitialized = false;
+
+document.addEventListener("fullscreenchange", () => {
+  if (!fullscreenInitialized || examSubmitted) return;
+
+  if (!document.fullscreenElement) {
+    registerViolation("Exited fullscreen mode");
+    setTimeout(enterFullscreen, 500);
+  }
+});
+
+// ================= TAB SWITCH =================
+document.addEventListener("visibilitychange", () => {
+  if (!examSubmitted && document.hidden) {
+    registerViolation("Tab switched");
+  }
+});
+
+// ================= COPY / PASTE =================
+document.addEventListener("contextmenu", e => e.preventDefault());
+
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey && ["c", "v", "x"].includes(e.key.toLowerCase())) {
+    e.preventDefault();
+    registerViolation("Copy/Paste attempt");
+  }
+});
+
+// ================= TIMER =================
+function startTimer() {
+  updateTimerUI();
 
   timerInterval = setInterval(() => {
-    const mins = Math.floor(timeLeft / 60);
-    const secs = timeLeft % 60;
-
-    timerEl.innerText = `${mins}:${secs < 10 ? "0" : ""}${secs}`;
-
-    if (timeLeft <= 0) {
+    if (examSubmitted) {
       clearInterval(timerInterval);
-      alert("⏱ Time is up! Exam will be submitted automatically.");
-      submitExam();
+      return;
     }
 
-    timeLeft--;
+    remainingSeconds--;
+
+    if (remainingSeconds <= 0) {
+      clearInterval(timerInterval);
+      autoSubmit("Time is up");
+      return;
+    }
+
+    updateTimerUI();
   }, 1000);
 }
 
-// ================= ANTI-CHEATING =================
-function enforceFullscreen() {
-  if (document.documentElement.requestFullscreen) {
-    document.documentElement.requestFullscreen();
-  }
-}
+function updateTimerUI() {
+  const el = document.getElementById("timer");
+  if (!el) return;
 
-function disableCopyPaste() {
-  document.addEventListener("copy", e => e.preventDefault());
-  document.addEventListener("paste", e => e.preventDefault());
-  document.addEventListener("contextmenu", e => e.preventDefault());
-}
-
-function detectTabSwitch(autoSubmit) {
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden && autoSubmit) {
-      alert("Tab switch detected. Exam will be submitted.");
-      submitExam();
-    }
-  });
+  const m = Math.floor(remainingSeconds / 60);
+  const s = remainingSeconds % 60;
+  el.innerText = `Time: ${m}:${String(s).padStart(2, "0")}`;
 }
 
 // ================= LOAD EXAM =================
-fetch(`/api/tests/${testId}`)
-  .then(res => res.json())
-  .then(data => {
-
-    document.getElementById("testTitle").innerText = data.title;
-
-    // ⏱️ START TIMER
-    if (!data.duration || data.duration <= 0) {
-      alert("Invalid exam duration");
-      return;
-    }
-    startTimer(data.duration);
-
-    // 🔐 APPLY SECURITY
-    if (data.security) {
-      if (data.security.fullscreen) enforceFullscreen();
-      if (data.security.disableCopyPaste) disableCopyPaste();
-      detectTabSwitch(data.security.autoSubmitOnTabChange);
-    }
-
-    let questions = data.questions;
-
-    // Shuffle questions
-    if (data.shuffleQuestions) {
-      questions = questions.sort(() => Math.random() - 0.5);
-    }
-
-    const container = document.getElementById("questions");
-    container.innerHTML = "";
-
-    questions.forEach((q, qi) => {
-      let options = q.options.map((opt, i) => ({ opt, i }));
-
-      // Shuffle options
-      if (data.shuffleOptions) {
-        options = options.sort(() => Math.random() - 0.5);
-      }
-
-      const div = document.createElement("div");
-      div.className = "question";
-
-      div.innerHTML = `
-        <h4>${qi + 1}. ${q.question}</h4>
-        ${options.map(o => `
-          <label>
-            <input type="radio" name="q${qi}" value="${o.i}">
-            ${o.opt}
-          </label><br>
-        `).join("")}
-      `;
-
-      container.appendChild(div);
-    });
-  })
-  .catch(err => {
-    console.error(err);
-    alert("Failed to load exam");
-  });
-
-// ================= SUBMIT EXAM =================
-async function submitExam() {
-  clearInterval(timerInterval);
-
-  const studentName = localStorage.getItem("studentName");
-  const studentReg = localStorage.getItem("studentReg");
-
-  const answers = [];
-  document.querySelectorAll(".question").forEach((q, i) => {
-    const selected = q.querySelector("input[type=radio]:checked");
-    answers[i] = selected ? parseInt(selected.value) : -1;
-  });
-
+async function loadExam() {
   try {
-    const res = await fetch("/api/exam/submit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        testId,
-        studentName,
-        studentReg,
-        answers
-      })
-    });
+    const res = await fetch(`/api/tests/${testId}`);
+    if (!res.ok) throw new Error("Test not found");
 
     const data = await res.json();
 
-    if (!res.ok) {
-      alert(data.message);
-      return;
-    }
+    questions = data.questions || [];
+    answers = new Array(questions.length).fill(null);
 
-    localStorage.setItem("attempted", "yes");
-    alert(`Score: ${data.score}/${data.total}`);
-    window.location.href = "/student-result.html";
+    remainingSeconds = (data.duration || 30) * 60;
+    startTimer();
 
+    const container = document.getElementById("examContainer");
+    container.innerHTML = "";
+
+    questions.forEach((q, i) => {
+      const div = document.createElement("div");
+      div.className = "question";
+      div.innerHTML = `<b>Q${i + 1}. ${q.question}</b>`;
+
+      q.options.forEach((opt, idx) => {
+        const label = document.createElement("label");
+        label.className = "option";
+
+        label.innerHTML = `
+          <span>${opt}</span>
+          <input type="radio" name="q${i}">
+        `;
+
+        label.querySelector("input").onchange = () => {
+          answers[i] = idx;
+        };
+
+        div.appendChild(label);
+      });
+
+      container.appendChild(div);
+    });
+
+    fullscreenInitialized = true;
   } catch (err) {
+    document.getElementById("examContainer").innerHTML =
+      "<p>Failed to load exam.</p>";
     console.error(err);
-    alert("Submission failed");
   }
 }
+
+// ================= SUBMIT =================
+function submitExam() {
+  if (examSubmitted) return;
+
+  examSubmitted = true;
+  clearInterval(timerInterval);
+
+  fetch("/api/exam/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ testId, studentName, studentReg, answers })
+  })
+    .then(res => res.json())
+    .then(data => {
+      // ✅ mark attempt
+      localStorage.setItem("attempted", "yes");
+      localStorage.setItem("lastResult", JSON.stringify(data));
+
+      alert(`Exam submitted!\nScore: ${data.score}/${data.total}`);
+      window.location.href = "/student-result.html";
+    })
+    .catch(() => alert("Submission failed"));
+}
+
+function autoSubmit(reason) {
+  if (examSubmitted) return;
+  alert(reason);
+  submitExam();
+}
+
+// ================= START =================
+enterFullscreen();
+setTimeout(() => (fullscreenInitialized = true), 1000);
+loadExam();
