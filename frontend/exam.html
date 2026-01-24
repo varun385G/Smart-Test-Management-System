@@ -1,103 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Online Exam</title>
+  <title>Online Examination</title>
 
-  <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="theme.css">
-  <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="responsive.css">
-<link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="app.css">
 
   <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f4f6f8;
-    }
-
-    header {
-      position: sticky;
-      top: 0;
-      background: #fff;
-      padding: 12px;
-      text-align: center;
-      font-weight: bold;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      z-index: 10;
-    }
-
-    .container {
-      max-width: 900px;
-      margin: auto;
-      padding: 16px;
+    .timer {
+      color: #dc2626;
+      font-weight: 600;
+      margin-top: 4px;
     }
 
     .question {
-      background: white;
-      padding: 16px;
-      margin-bottom: 12px;
-      border-radius: 6px;
+      margin-bottom: 16px;
     }
 
     .option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between; /* text left, radio right */
-  gap: 12px;
-  margin: 10px 0;
-  cursor: pointer;
-}
-
-.option span {
-  flex: 1;
-  text-align: left;
-}
-
-.option input[type="radio"] {
-  margin: 0;
-}
-
-
-    .option input[type="radio"] {
-      margin: 0;
-      transform: translateY(1px);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      margin-top: 10px;
+      cursor: pointer;
+      transition: background 0.2s ease;
     }
 
-    button {
-      width: 100%;
-      padding: 14px;
-      font-size: 16px;
-      border: none;
-      background: #007bff;
-      color: white;
-      border-radius: 6px;
-      margin: 16px 0;
+    .option:hover {
+      background: #eef2ff;
     }
 
-    button:hover {
-      background: #0056b3;
+    .option input {
+      transform: scale(1.2);
     }
   </style>
 </head>
 
 <body>
 
-<header>
-  <div>Online Examination</div>
-  <div id="timer" style="color:red;">Time: --:--</div>
-</header>
+  <!-- HEADER -->
+  <header class="header">
+    <div>
+      <h2>Online Examination</h2>
+      <div id="timer" class="timer">Time: --:--</div>
+    </div>
+  </header>
 
-<div class="container" id="examContainer">
-  <p id="loadingText">Loading exam… Please wait</p>
-</div>
+  <!-- MAIN -->
+  <main class="container" id="examContainer">
+    <div class="card center muted">Loading exam…</div>
+  </main>
 
-<button onclick="submitExam()">Submit Exam</button>
+  <!-- SUBMIT -->
+  <div class="container">
+    <button class="danger" onclick="submitExam()">Submit Exam</button>
+  </div>
 
-<script src="exam.js"></script>
+  <script src="exam.js"></script>
 </body>
 </html>

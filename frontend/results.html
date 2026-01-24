@@ -1,50 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <meta charset="UTF-8">
-  <title>Results</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Results</title>
 
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="responsive.css">
-<link rel="stylesheet" href="app.css">
-
+  <link rel="stylesheet" href="app.css">
 </head>
 
 <body>
 
-<header class="header">
-  <h2>Test Results</h2>
-  <div>
-    <button onclick="exportCSV()">Export CSV</button>
+  <header class="header">
+    <h2>Test Results</h2>
     <button class="secondary" onclick="goBack()">⬅ Dashboard</button>
-  </div>
-</header>
+  </header>
 
-<main class="container">
-  <table>
-    <thead>
-      <tr>
-        <th>Student</th>
-        <th>Reg No</th>
-        <th>Score</th>
-        <th>Date</th>
-      </tr>
-    </thead>
-    <tbody id="resultTable"></tbody>
-  </table>
-</main>
+  <main class="container">
 
-<script src="results.js"></script>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Register No</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody id="resultTable"></tbody>
+      </table>
+    </div>
 
-<script>
-  function goBack() {
-    window.location.href = "/dashboard.html";
-  }
-</script>
+  </main>
 
+  <script src="results.js"></script>
 </body>
 </html>

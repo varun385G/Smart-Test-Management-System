@@ -126,7 +126,8 @@ async function loadExam() {
     questions.forEach((q, i) => {
       const div = document.createElement("div");
       div.className = "question";
-      div.innerHTML = `<b>Q${i + 1}. ${q.question}</b>`;
+     div.innerHTML = `<h3>Q${i + 1}. ${q.question}</h3>`;
+
 
       q.options.forEach((opt, idx) => {
         const label = document.createElement("label");

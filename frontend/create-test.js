@@ -110,12 +110,30 @@ async function saveTest() {
       return;
     }
 
-    // ✅ SUCCESS — STOP HERE
-    alert("Test Created Successfully!\nTest ID: " + data.testId);
-    window.location.href = "/dashboard.html";
+    // ✅ SHOW TEST DETAILS CLEARLY (NO ALERT)
+    const box = document.getElementById("resultBox");
+    box.innerHTML = `
+      <div class="card">
+        <h3>✅ Test Created Successfully</h3>
+        <p><b>Test ID:</b> <span id="tid">${data.testId}</span></p>
+        <p><b>Password:</b> <span id="tpass">${password}</span></p>
+
+        <button onclick="copyText('tid')">Copy Test ID</button>
+        <button onclick="copyText('tpass')">Copy Password</button>
+        <br><br>
+        <button onclick="goBack()">Back to Dashboard</button>
+      </div>
+    `;
 
   } catch (err) {
     console.error("SAVE TEST ERROR:", err);
     alert("Failed to save test. Check inputs or server.");
   }
+}
+
+// ================= COPY =================
+function copyText(id) {
+  const text = document.getElementById(id).innerText;
+  navigator.clipboard.writeText(text);
+  alert("Copied to clipboard");
 }

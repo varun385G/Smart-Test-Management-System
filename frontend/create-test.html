@@ -1,93 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <meta charset="UTF-8">
   <title>Create Test</title>
 
+  <!-- FONTS -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="ui.css">
-  <link rel="stylesheet" href="theme.css">
-  <link rel="stylesheet" href="create-test.css">
-  <link rel="stylesheet" href="responsive.css">
-<link rel="stylesheet" href="app.css">
 
+  <!-- GLOBAL STYLES -->
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="responsive.css">
+  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="create-test.css">
 </head>
 
 <body>
 
-<header class="header">
-  <h2>Create New Test</h2>
-  <button class="secondary" onclick="goBack()">⬅ Dashboard</button>
-</header>
+  <!-- ===== HEADER ===== -->
+  <header class="header">
+    <h2>Create New Test</h2>
+    <button class="secondary" onclick="goBack()">⬅ Dashboard</button>
+  </header>
 
-<main class="container">
+  <!-- ===== MAIN ===== -->
+  <main class="container">
 
-  <!-- BASIC DETAILS -->
-  <section>
-    <h3>Test Details</h3>
-    <input id="title" placeholder="Test Title">
-    <input id="password" placeholder="Test Password">
-    <input id="duration" type="number" placeholder="Duration (minutes)">
-  </section>
+    <!-- TEST DETAILS -->
+    <div class="card">
+      <h3>Test Details</h3>
+      <input id="title" placeholder="Test Title">
+      <input id="password" placeholder="Test Password">
+      <input id="duration" type="number" placeholder="Duration (minutes)">
+    </div>
 
-  <br>
+    <!-- SETTINGS -->
+    <div class="card">
+      <h3>Exam Settings</h3>
 
-  <!-- SETTINGS -->
-  <section>
-    <h3>Exam Settings</h3>
+      <label>
+        <input type="checkbox" id="shuffleQ" checked>
+        Shuffle Questions
+      </label><br><br>
 
-    <label>
-      <input type="checkbox" id="shuffleQ" checked>
-      Shuffle Questions
-    </label><br>
+      <label>
+        <input type="checkbox" id="shuffleA" checked>
+        Shuffle Answers
+      </label>
+    </div>
 
-    <label>
-      <input type="checkbox" id="shuffleA" checked>
-      Shuffle Answers
-    </label>
-  </section>
+    <!-- SECURITY -->
+    <div class="card">
+      <h3>Security Rules</h3>
 
-  <br>
+      <label>
+        <input type="checkbox" id="fullscreen" checked>
+        Enforce Fullscreen
+      </label><br><br>
 
-  <!-- SECURITY -->
-  <section>
-    <h3>Security Rules</h3>
+      <label>
+        <input type="checkbox" id="disableCopy" checked>
+        Disable Copy / Paste
+      </label><br><br>
 
-    <label>
-      <input type="checkbox" id="fullscreen" checked>
-      Enforce Fullscreen
-    </label><br>
+      <label>
+        <input type="checkbox" id="autoSubmitTab">
+        Auto Submit on Tab Switch
+      </label>
+    </div>
 
-    <label>
-      <input type="checkbox" id="disableCopy" checked>
-      Disable Copy / Paste
-    </label><br>
+    <!-- QUESTIONS -->
+    <div class="card">
+      <h3>Questions</h3>
+      <div id="questions"></div>
+      <br>
+      <button onclick="addQuestion()">➕ Add Question</button>
+    </div>
 
-    <label>
-      <input type="checkbox" id="autoSubmitTab">
-      Auto Submit on Tab Switch
-    </label>
-  </section>
+    <!-- ACTION -->
+    <div class="card center">
+      <button onclick="saveTest()">💾 Save Test</button>
+    </div>
 
-  <br>
+    <!-- ✅ RESULT BOX -->
+    <div id="resultBox"></div>
 
-  <!-- QUESTIONS -->
-  <section>
-    <h3>Questions</h3>
-    <div id="questions"></div>
+  </main>
 
-    <button onclick="addQuestion()">➕ Add Question</button>
-  </section>
+  <!-- SCRIPT -->
+  <script src="create-test.js"></script>
 
-  <br>
-
-  <!-- ACTION -->
-  <button onclick="saveTest()">💾 Save Test</button>
-
-</main>
-
-<script src="create-test.js"></script>
 </body>
 </html>
