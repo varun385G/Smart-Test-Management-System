@@ -9,12 +9,17 @@ const testSchema = new mongoose.Schema({
   shuffleOptions: Boolean,
   questions: Array,
 
+  security: {
+    fullscreen: Boolean,
+    disableCopyPaste: Boolean,
+    autoSubmitOnTabChange: Boolean
+  },
+
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Staff", // 🔥 REQUIRED FOR populate
+    ref: "Staff",
     required: true
   }
-
 }, { timestamps: true });
 
 module.exports = mongoose.model("Test", testSchema);
