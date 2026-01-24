@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard</title>
 
-  <!-- GLOBAL UI -->
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="responsive.css">
@@ -13,22 +13,23 @@
 
 <body>
 
-  <!-- ===== HEADER ===== -->
+  <!-- HEADER -->
   <header class="header">
     <h2 id="staffName">Welcome</h2>
     <button class="secondary" onclick="logout()">Logout</button>
   </header>
 
-  <!-- ===== MAIN ===== -->
+  <!-- MAIN -->
   <main class="container">
 
     <!-- ADMIN CONTROLS -->
     <div class="card admin-only">
       <h3>Admin Controls</h3>
       <p class="muted">Staff & system management</p>
-      <br>
-      <button onclick="goCreateStaff()">Create Staff</button>
-      <button onclick="goManageStaff()">Manage Staff</button>
+      <div>
+        <button onclick="goCreateStaff()">Create Staff</button>
+        <button onclick="goManageStaff()">Manage Staff</button>
+      </div>
     </div>
 
     <br>
@@ -37,15 +38,16 @@
     <div class="card">
       <h3>Test Management</h3>
       <p class="muted">Create, manage and evaluate tests</p>
-      <br>
-      <button onclick="goToCreateTest()">Create Test</button>
-      <button onclick="goToManageTests()">Manage Tests</button>
-      <button onclick="goToResults()">View Results</button>
+      <div>
+        <button onclick="goToCreateTest()">Create Test</button>
+        <button onclick="goToManageTests()">Manage Tests</button>
+        <button onclick="goToResults()">View Results</button>
+      </div>
     </div>
 
     <br>
 
-    <!-- RECENT ACTIVITY -->
+    <!-- ACTIVITY -->
     <div class="card activity">
       <h3>Recent Activity</h3>
       <ul class="muted"></ul>
@@ -53,8 +55,6 @@
 
   </main>
 
-  <!-- SCRIPT -->
   <script src="dashboard.js"></script>
-
 </body>
 </html>
