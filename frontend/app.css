@@ -170,4 +170,40 @@ h1, h2, h3 {
   h3 {
     font-size: 16px;
   }
+}.staff-card {
+  margin-bottom: 24px;
 }
+
+.test-block {
+  margin-left: 16px;
+  margin-top: 12px;
+}
+
+.test-block table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.test-block th,
+.test-block td {
+  border: 1px solid #e5e7eb;
+  padding: 8px;
+  text-align: left;
+}
+
+.test-block th {
+  background: #f1f5f9;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 14px;
+}
+.q-image {
+  display: block;
+  max-width: 100%;
+  margin: 12px auto;
+}
+
+

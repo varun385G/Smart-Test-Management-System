@@ -1,90 +1,146 @@
 let questionCount = 0;
 
 function goBack() {
-  window.location.href = "/dashboard.html";
+  location.href = "/dashboard.html";
 }
 
+/* ================= COPY TEST ID (GLOBAL) ================= */
+function copyTestId() {
+  const text = document.getElementById("createdTestId").innerText;
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text)
+      .then(() => alert("Test ID copied"))
+      .catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const tempInput = document.createElement("input");
+  tempInput.value = text;
+  document.body.appendChild(tempInput);
+  tempInput.select();
+  document.execCommand("copy");
+  document.body.removeChild(tempInput);
+  alert("Test ID copied");
+}
+
+/* ================= ADD QUESTION ================= */
 function addQuestion() {
   questionCount++;
 
   const qDiv = document.createElement("div");
-  qDiv.className = "question";
+  qDiv.className = "card";
+  qDiv.style.marginBottom = "16px";
 
   qDiv.innerHTML = `
     <h4>Question ${questionCount}</h4>
 
+    <select class="q-type">
+      <option value="MCQ">MCQ (Single Correct)</option>
+      <option value="MSQ">MSQ (Multiple Correct)</option>
+      <option value="NAT">NAT (Numeric Answer)</option>
+    </select>
+
     <input class="q-text" placeholder="Question text">
+    <input class="q-image" placeholder="Image URL (optional)">
 
-    <div class="option">
-      <input type="radio" name="q${questionCount}">
-      <input class="opt" placeholder="Option A">
-    </div>
-
-    <div class="option">
-      <input type="radio" name="q${questionCount}">
-      <input class="opt" placeholder="Option B">
-    </div>
-
-    <div class="option">
-      <input type="radio" name="q${questionCount}">
-      <input class="opt" placeholder="Option C">
-    </div>
-
-    <div class="option">
-      <input type="radio" name="q${questionCount}">
-      <input class="opt" placeholder="Option D">
-    </div>
+    <div class="options"></div>
+    <input class="nat-answer" type="number"
+      placeholder="Correct numeric answer"
+      style="display:none">
   `;
+
+  const typeSelect = qDiv.querySelector(".q-type");
+  const optionsDiv = qDiv.querySelector(".options");
+  const natInput = qDiv.querySelector(".nat-answer");
+
+  function renderOptions(type) {
+    optionsDiv.innerHTML = "";
+    natInput.style.display = "none";
+
+    if (type === "MCQ" || type === "MSQ") {
+      for (let i = 0; i < 4; i++) {
+        optionsDiv.innerHTML += `
+          <label style="display:flex;gap:10px;margin-top:8px">
+            <input type="${type === "MCQ" ? "radio" : "checkbox"}"
+                   name="q${questionCount}">
+            <input class="opt" placeholder="Option ${String.fromCharCode(65 + i)}">
+          </label>
+        `;
+      }
+    }
+
+    if (type === "NAT") {
+      natInput.style.display = "block";
+    }
+  }
+
+  typeSelect.onchange = () => renderOptions(typeSelect.value);
+  renderOptions("MCQ");
 
   document.getElementById("questions").appendChild(qDiv);
 }
 
-// ================= SAVE TEST =================
+/* ================= SAVE TEST ================= */
 async function saveTest() {
   try {
     const title = document.getElementById("title").value.trim();
     const password = document.getElementById("password").value.trim();
     const duration = Number(document.getElementById("duration").value);
 
-    const shuffleQuestions = document.getElementById("shuffleQ").checked;
-    const shuffleOptions = document.getElementById("shuffleA").checked;
-
-    const security = {
-      fullscreen: document.getElementById("fullscreen").checked,
-      disableCopyPaste: document.getElementById("disableCopy").checked,
-      autoSubmitOnTabChange: document.getElementById("autoSubmitTab").checked
-    };
-
     if (!title || !password || !duration) {
       alert("Title, password and duration are required");
       return;
     }
 
-    const questionDivs = document.querySelectorAll(".question");
-    if (questionDivs.length === 0) {
-      alert("Add at least one question");
-      return;
-    }
-
     const questions = [];
 
-    for (const qDiv of questionDivs) {
-      const questionText = qDiv.querySelector(".q-text").value.trim();
-      const optionInputs = qDiv.querySelectorAll(".opt");
-      const options = Array.from(optionInputs).map(o => o.value.trim());
+    document.querySelectorAll("#questions .card").forEach(qDiv => {
+      const type = qDiv.querySelector(".q-type").value;
+      const question = qDiv.querySelector(".q-text").value.trim();
+      const image = qDiv.querySelector(".q-image").value.trim();
 
-      let correctIndex = -1;
-      qDiv.querySelectorAll("input[type=radio]").forEach((r, i) => {
-        if (r.checked) correctIndex = i;
-      });
+      if (!question) throw "Question text required";
 
-      if (!questionText || options.some(o => !o) || correctIndex === -1) {
-        alert("Fill all question fields and select correct answer");
-        return;
+      const qObj = { type, question, image };
+
+      if (type === "MCQ") {
+        const opts = [...qDiv.querySelectorAll(".opt")].map(o => o.value.trim());
+        const radios = qDiv.querySelectorAll("input[type=radio]");
+        const correctIndex = [...radios].findIndex(r => r.checked);
+
+        if (opts.some(o => !o) || correctIndex === -1)
+          throw "Fill MCQ options and select correct answer";
+
+        qObj.options = opts;
+        qObj.correctIndex = correctIndex;
       }
 
-      questions.push({ question: questionText, options, correctIndex });
-    }
+      if (type === "MSQ") {
+        const opts = [...qDiv.querySelectorAll(".opt")].map(o => o.value.trim());
+        const checks = qDiv.querySelectorAll("input[type=checkbox]");
+        const correctIndexes = [...checks]
+          .map((c, i) => (c.checked ? i : -1))
+          .filter(i => i !== -1);
+
+        if (opts.some(o => !o) || correctIndexes.length === 0)
+          throw "Fill MSQ options and select at least one correct answer";
+
+        qObj.options = opts;
+        qObj.correctIndexes = correctIndexes;
+      }
+
+      if (type === "NAT") {
+        const val = qDiv.querySelector(".nat-answer").value;
+        if (val === "") throw "Numeric answer required";
+        qObj.correctValue = Number(val);
+      }
+
+      questions.push(qObj);
+    });
 
     const staffId = localStorage.getItem("staffId");
 
@@ -95,45 +151,20 @@ async function saveTest() {
         title,
         password,
         duration,
-        shuffleQuestions,
-        shuffleOptions,
-        security,
         questions,
         staffId
       })
     });
 
     const data = await res.json();
+    if (!res.ok) throw data.message;
 
-    if (!res.ok) {
-      alert(data.message || "Failed to save test");
-      return;
-    }
-
-    // ✅ SHOW TEST DETAILS CLEARLY (NO ALERT)
-    const box = document.getElementById("resultBox");
-    box.innerHTML = `
-      <div class="card">
-        <h3>✅ Test Created Successfully</h3>
-        <p><b>Test ID:</b> <span id="tid">${data.testId}</span></p>
-        <p><b>Password:</b> <span id="tpass">${password}</span></p>
-
-        <button onclick="copyText('tid')">Copy Test ID</button>
-        <button onclick="copyText('tpass')">Copy Password</button>
-        <br><br>
-        <button onclick="goBack()">Back to Dashboard</button>
-      </div>
-    `;
+    // ✅ SHOW SUCCESS UI
+    document.getElementById("successBox").style.display = "block";
+    document.getElementById("createdTestId").innerText = data.testId;
+    document.querySelector("main").style.display = "none";
 
   } catch (err) {
-    console.error("SAVE TEST ERROR:", err);
-    alert("Failed to save test. Check inputs or server.");
+    alert(err);
   }
-}
-
-// ================= COPY =================
-function copyText(id) {
-  const text = document.getElementById(id).innerText;
-  navigator.clipboard.writeText(text);
-  alert("Copied to clipboard");
 }

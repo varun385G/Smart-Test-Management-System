@@ -24,6 +24,17 @@
     <h2>Create New Test</h2>
     <button class="secondary" onclick="goBack()">⬅ Dashboard</button>
   </header>
+<!-- SUCCESS MESSAGE -->
+<div id="successBox" class="card center" style="display:none">
+  <h3>Test Created Successfully</h3>
+  <p class="muted">Share this Test ID with students</p>
+
+  <h2 id="createdTestId" style="margin:12px 0"></h2>
+
+  <button onclick="copyTestId()">Copy Test ID</button>
+  <br><br>
+  <button class="secondary" onclick="goBack()">Go to Dashboard</button>
+</div>
 
   <!-- ===== MAIN ===== -->
   <main class="container">
@@ -72,11 +83,15 @@
     </div>
 
     <!-- QUESTIONS -->
-    <div class="card">
-      <h3>Questions</h3>
-      <div id="questions"></div>
-      <br>
-      <button onclick="addQuestion()">➕ Add Question</button>
+    <h3>Questions</h3>
+<div id="questions"></div>
+
+<button onclick="addQuestion()">➕ Add Question</button>
+
+<p class="muted" style="margin-top:10px">
+  Supported types: MCQ, MSQ, NAT (Numeric Answer)
+</p>
+
     </div>
 
     <!-- ACTION -->

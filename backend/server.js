@@ -12,11 +12,11 @@ const Test = require("./models/Test");
 
 const app = express();
 
-// ================= MIDDLEWARE =================
-app.use(cors({ origin: "*", methods: ["GET", "POST", "DELETE"] }));
+/* ================= MIDDLEWARE ================= */
+app.use(cors());
 app.use(express.json());
 
-// ================= DATABASE =================
+/* ================= DATABASE ================= */
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
@@ -25,12 +25,12 @@ mongoose
     process.exit(1);
   });
 
-// ================= HEALTH =================
+/* ================= HEALTH ================= */
 app.get("/api/health", (req, res) => {
   res.json({ status: "API running" });
 });
 
-// ================= STAFF LOGIN =================
+/* ================= STAFF LOGIN ================= */
 app.post("/api/staff/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -47,68 +47,76 @@ app.post("/api/staff/login", async (req, res) => {
   });
 });
 
-// ================= CREATE TEST =================
+/* ================= CREATE TEST ================= */
 function generateTestId() {
   return "ST-" + Math.floor(100000 + Math.random() * 900000);
 }
 
 app.post("/api/tests/create", async (req, res) => {
-  const {
-    title,
-    password,
-    duration,
-    shuffleQuestions,
-    shuffleOptions,
-    questions,
-    security,
-    staffId
-  } = req.body;
+  try {
+    const { title, password, duration, questions, security, staffId } = req.body;
 
-  const test = new Test({
-    testId: generateTestId(),
-    title,
-    password,
-    duration,
-    shuffleQuestions,
-    shuffleOptions,
-    questions,
-    security,
-    createdBy: staffId
-  });
+    const test = new Test({
+      testId: generateTestId(),
+      title,
+      password,
+      duration,
+      questions,
+      security,
+      createdBy: staffId,
+      resultsPublished: false
+    });
 
-  await test.save();
-  res.json({ testId: test.testId });
+    await test.save();
+    res.json({ testId: test.testId });
+  } catch (err) {
+    console.error("CREATE TEST ERROR:", err);
+    res.status(500).json({ message: "Failed to create test" });
+  }
 });
 
-// ================= FETCH TEST =================
+/* ================= FETCH TEST ================= */
 app.get("/api/tests/:testId", async (req, res) => {
   const test = await Test.findOne({ testId: req.params.testId });
   if (!test) return res.status(404).json({ message: "Test not found" });
-
   res.json(test);
 });
 
-// ================= TESTS BY STAFF =================
+/* ================= TESTS BY STAFF ================= */
 app.get("/api/tests/by-staff/:staffId", async (req, res) => {
-  const tests = await Test.find({ createdBy: req.params.staffId });
+  const tests = await Test.find({ createdBy: req.params.staffId }).sort({ createdAt: -1 });
 
-  const enhanced = await Promise.all(
-    tests.map(async t => {
-      const attempts = await Result.countDocuments({ testId: t.testId });
-      return { ...t.toObject(), attempts };
-    })
+  const enriched = await Promise.all(
+    tests.map(async t => ({
+      _id: t._id,
+      testId: t.testId,
+      title: t.title,
+      resultsPublished: t.resultsPublished,
+      attempts: await Result.countDocuments({ testId: t.testId })
+    }))
   );
 
-  res.json(enhanced);
+  res.json(enriched);
 });
 
-// ================= DELETE TEST =================
+/* ================= DELETE TEST ================= */
 app.delete("/api/tests/:id", async (req, res) => {
   await Test.findByIdAndDelete(req.params.id);
   res.json({ message: "Test deleted" });
 });
 
-// ================= STUDENT VALIDATE =================
+/* ================= PUBLISH RESULTS ================= */
+app.post("/api/tests/:testId/publish-results", async (req, res) => {
+  const test = await Test.findOne({ testId: req.params.testId });
+  if (!test) return res.status(404).json({ message: "Test not found" });
+
+  test.resultsPublished = true;
+  await test.save();
+
+  res.json({ message: "Results published" });
+});
+
+/* ================= STUDENT VALIDATE ================= */
 app.post("/api/student/validate", async (req, res) => {
   const { testId, password, reg } = req.body;
 
@@ -119,163 +127,133 @@ app.post("/api/student/validate", async (req, res) => {
     return res.status(401).json({ message: "Invalid password" });
 
   const attempted = await Result.findOne({ testId, studentReg: reg });
-  if (attempted)
-    return res.status(403).json({ message: "Already attempted" });
 
-  res.json({ message: "Validated" });
+  if (attempted) {
+    return res.json({
+      attempted: true,
+      resultsPublished: test.resultsPublished
+    });
+  }
+
+  res.json({ attempted: false });
 });
 
-// ================= SUBMIT EXAM =================
+/* ================= SUBMIT EXAM ================= */
 app.post("/api/exam/submit", async (req, res) => {
-  const { testId, studentName, studentReg, answers } = req.body;
+  try {
+    const { testId, studentName, studentReg, answers } = req.body;
 
-  const test = await Test.findOne({ testId });
+    const test = await Test.findOne({ testId });
+    if (!test) return res.status(404).json({ message: "Test not found" });
+
+    // ⛔ Block re-attempt
+    const exists = await Result.findOne({ testId, studentReg });
+    if (exists) return res.json({ message: "Already submitted" });
+
+    let score = 0;
+
+    test.questions.forEach((q, i) => {
+      const ans = answers[i];
+
+      if (q.type === "MCQ" && ans === q.correctIndex) score++;
+
+      if (
+        q.type === "MSQ" &&
+        Array.isArray(ans) &&
+        Array.isArray(q.correctIndexes) &&
+        ans.sort().join(",") === q.correctIndexes.sort().join(",")
+      ) score++;
+
+      if (q.type === "NAT" && ans === q.correctValue) score++;
+    });
+
+    // 🔥 Normalize answers before save
+    const safeAnswers = answers.map(a =>
+      Array.isArray(a) ? [...a] : a
+    );
+
+    await Result.create({
+      testId,
+      studentName,
+      studentReg,
+      answers: safeAnswers,
+      score,
+      total: test.questions.length
+    });
+
+    res.json({ message: "Submitted" });
+  } catch (err) {
+    console.error("SUBMIT ERROR:", err);
+    res.status(500).json({ message: "Submit failed" });
+  }
+});
+
+/* ================= STAFF VIEW RESULTS ================= */
+app.get("/api/results/:testId", async (req, res) => {
+  const test = await Test.findOne({ testId: req.params.testId });
   if (!test) return res.status(404).json({ message: "Test not found" });
 
-  let score = 0;
-  test.questions.forEach((q, i) => {
-    if (answers[i] === q.correctIndex) score++;
-  });
+  if (!test.resultsPublished)
+    return res.status(403).json({ message: "Results not published" });
 
-  await Result.create({
-    testId,
-    studentName,
-    studentReg,
-    answers,
-    score,
-    total: test.questions.length
-  });
-
-  res.json({ score, total: test.questions.length });
-});
-
-// ================= RESULTS =================
-app.get("/api/results/:testId", async (req, res) => {
   const results = await Result.find({ testId: req.params.testId });
   res.json(results);
 });
-// ================= EXPORT RESULTS CSV =================
-app.get("/api/results/:testId/csv", async (req, res) => {
-  try {
-    const results = await Result.find({ testId: req.params.testId });
 
-    if (!results.length) {
-      return res.status(404).send("No results found");
-    }
+/* ================= STUDENT RESULT ================= */
+app.get("/api/student/result/:testId/:reg", async (req, res) => {
+  const test = await Test.findOne({ testId: req.params.testId });
+  if (!test || !test.resultsPublished)
+    return res.status(403).json({ message: "Results not available" });
 
-    let csv = "Student Name,Register Number,Score,Total,Percentage,Date\n";
+  const result = await Result.findOne({
+    testId: req.params.testId,
+    studentReg: req.params.reg
+  });
 
-    results.forEach(r => {
-      const percent = Math.round((r.score / r.total) * 100);
-      csv += `"${r.studentName}","${r.studentReg}",${r.score},${r.total},${percent},"${r.submittedAt.toLocaleString()}"\n`;
-    });
-
-    res.setHeader("Content-Type", "text/csv");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="results_${req.params.testId}.csv"`
-    );
-
-    res.send(csv);
-  } catch (err) {
-    console.error("CSV EXPORT ERROR:", err);
-    res.status(500).send("Failed to export CSV");
-  }
+  if (!result) return res.status(404).json({ message: "Result not found" });
+  res.json(result);
 });
 
-// ================= ADMIN STAFF =================
-app.get("/api/admin/staff", async (req, res) => {
-  const staff = await Staff.find({ role: "staff" }).select("-password");
-  res.json(staff);
-});
-
-app.post("/api/admin/create-staff", async (req, res) => {
-  const { name, email, password } = req.body;
-  const hashed = await bcrypt.hash(password, 10);
-
-  await Staff.create({ name, email, password: hashed, role: "staff" });
-  res.json({ message: "Staff created" });
-});
-
-app.delete("/api/admin/staff/:id", async (req, res) => {
-  await Staff.findByIdAndDelete(req.params.id);
-  res.json({ message: "Staff deleted" });
-});
-
-// ================= ADMIN: FULL STAFF → TEST → RESULT VIEW =================
+/* ================= ADMIN RESULTS ================= */
 app.get("/api/admin/results/grouped", async (req, res) => {
-  try {
-    const staffList = await Staff.find({ role: "staff" });
-    const tests = await Test.find().populate("createdBy");
-    const results = await Result.find();
+  const staffList = await Staff.find({ role: "staff" });
+  const tests = await Test.find().populate("createdBy");
+  const results = await Result.find();
 
-    const grouped = {};
+  const grouped = {};
 
-    // 1. Initialize ALL staff
-    staffList.forEach(staff => {
-      grouped[staff._id.toString()] = {
-        staffName: staff.name,
-        tests: {}
-      };
-    });
+  staffList.forEach(s => {
+    grouped[s._id.toString()] = { staffName: s.name, tests: {} };
+  });
 
-    // 2. Attach ALL tests to correct staff
-    tests.forEach(test => {
-      if (!test.createdBy) return;
+  tests.forEach(t => {
+  if (!t.createdBy || !grouped[t.createdBy._id.toString()]) return;
 
-      const staffId = test.createdBy._id.toString();
-
-      if (!grouped[staffId]) {
-        grouped[staffId] = {
-          staffName: test.createdBy.name,
-          tests: {}
-        };
-      }
-
-      grouped[staffId].tests[test.testId] = {
-        testTitle: test.title,
-        results: []
-      };
-    });
-
-    // 3. Attach ALL results to correct tests
-    results.forEach(r => {
-      Object.values(grouped).forEach(staff => {
-        if (staff.tests[r.testId]) {
-          staff.tests[r.testId].results.push({
-            studentName: r.studentName,
-            studentReg: r.studentReg,
-            score: r.score,
-            total: r.total,
-            date: r.submittedAt
-          });
-        }
-      });
-    });
-
-    res.json(grouped);
-  } catch (err) {
-    console.error("ADMIN RESULTS ERROR:", err);
-    res.status(500).json({ message: "Failed to load admin results" });
-  }
+  grouped[t.createdBy._id.toString()].tests[t.testId] = {
+    testTitle: t.title,
+    resultsPublished: t.resultsPublished,
+    results: []
+  };
 });
 
-// ================= FRONTEND =================
+
+  results.forEach(r => {
+    Object.values(grouped).forEach(s => {
+      if (s.tests[r.testId]) s.tests[r.testId].results.push(r);
+    });
+  });
+
+  res.json(grouped);
+});
+
+/* ================= FRONTEND ================= */
 app.use(express.static(path.join(__dirname, "../frontend")));
+app.get("/", (req, res) =>
+  res.sendFile(path.join(__dirname, "../frontend/index.html"))
+);
 
-// SAFE REDIRECTS
-app.get("/staff", (req, res) => res.redirect("/staff.html"));
-app.get("/student", (req, res) => res.redirect("/student.html"));
-app.get("/dashboard", (req, res) => res.redirect("/dashboard.html"));
-app.get("/create-staff", (req, res) => res.redirect("/create-staff.html"));
-app.get("/manage-staff", (req, res) => res.redirect("/manage-staff.html"));
-
-// ================= HOME =================
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/index.html"));
-});
-
-// ================= START =================
+/* ================= START ================= */
 app.listen(process.env.PORT || 3000, () =>
   console.log("🚀 Server running")
 );

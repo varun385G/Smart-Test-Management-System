@@ -1,38 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css">
-<link rel="stylesheet" href="ui.css">
-<link rel="stylesheet" href="responsive.css">
-<link rel="stylesheet" href="app.css">
-
-  <meta charset="UTF-8">
   <title>Manage Tests</title>
-  <link rel="stylesheet" href="manage-tests.css">
+
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="responsive.css">
+  <link rel="stylesheet" href="app.css">
 </head>
+
 <body>
 
 <header class="header">
   <h2>Manage Tests</h2>
-  <button onclick="goBack()">⬅ Dashboard</button>
+  <button class="secondary" onclick="goBack()">⬅ Dashboard</button>
 </header>
 
-<div class="container">
+<main class="container">
   <table>
     <thead>
       <tr>
         <th>Test ID</th>
         <th>Title</th>
-        <th>Created</th>
+        <th>Attempts</th>
         <th>Actions</th>
       </tr>
     </thead>
-    <tbody id="testList"></tbody>
+    <tbody id="testTable"></tbody>
   </table>
-</div>
+</main>
 
 <script src="manage-tests.js"></script>
 </body>

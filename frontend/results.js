@@ -1,46 +1,81 @@
 async function loadResults() {
   const testId = new URLSearchParams(window.location.search).get("testId");
+  const tbody = document.getElementById("results");
 
-  if (!testId) {
-    alert("Invalid Test ID");
+  // 🛑 Safety check
+  if (!tbody) {
+    console.error("❌ <tbody id='results'> not found in HTML");
     return;
   }
 
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="4" style="text-align:center;">Loading...</td>
+    </tr>
+  `;
+
   try {
     const res = await fetch(`/api/results/${testId}`);
-    const data = await res.json();
 
-    const tbody = document.getElementById("resultTable");
-    tbody.innerHTML = "";
-
-    if (!data || data.length === 0) {
+    // 🔒 Results not published
+    if (res.status === 403) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="3" class="center muted">No results found</td>
+          <td colspan="4" style="text-align:center;">
+            Results not published yet
+          </td>
         </tr>
       `;
       return;
     }
 
-    data.forEach(r => {
-      const row = document.createElement("tr");
+    // ❌ Any other error
+    if (!res.ok) {
+      throw new Error("Failed to load results");
+    }
 
-      row.innerHTML = `
-        <td>${r.studentName}</td>
-        <td>${r.studentReg}</td>
-        <td>${r.score}/${r.total}</td>
+    const data = await res.json();
+
+    // 🟡 No attempts
+    if (!data.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="4" style="text-align:center;">
+            No attempts yet
+          </td>
+        </tr>
       `;
+      return;
+    }
 
-      tbody.appendChild(row);
+    // ✅ Render results
+    tbody.innerHTML = "";
+
+    data.forEach(r => {
+      tbody.innerHTML += `
+        <tr>
+          <td>${r.studentName}</td>
+          <td>${r.studentReg}</td>
+          <td>${r.score} / ${r.total}</td>
+          <td>${new Date(r.submittedAt).toLocaleString()}</td>
+        </tr>
+      `;
     });
 
   } catch (err) {
     console.error("RESULT LOAD ERROR:", err);
-    alert("Failed to load results");
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4" style="text-align:center;">
+          Error loading results
+        </td>
+      </tr>
+    `;
   }
 }
 
-function goBack() {
+// ⬅ Dashboard button
+function goDashboard() {
   window.location.href = "/dashboard.html";
 }
 

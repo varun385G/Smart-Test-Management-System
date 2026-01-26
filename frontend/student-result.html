@@ -1,66 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Exam Result</title>
 
+  <!-- Global UI -->
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="responsive.css">
-<link rel="stylesheet" href="app.css">
-
-  <style>
-    body {
-      background: #f4f6f8;
-      font-family: Arial, sans-serif;
-    }
-
-    .card {
-      max-width: 500px;
-      margin: 60px auto;
-      background: white;
-      padding: 24px;
-      border-radius: 8px;
-      text-align: center;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-
-    .score {
-      font-size: 32px;
-      margin: 16px 0;
-    }
-
-    .pass {
-      color: green;
-      font-weight: bold;
-    }
-
-    .fail {
-      color: red;
-      font-weight: bold;
-    }
-
-    button {
-      margin-top: 20px;
-      width: 100%;
-      padding: 12px;
-      background: #007bff;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-size: 16px;
-    }
-  </style>
+  <link rel="stylesheet" href="app.css">
 </head>
+
 <body>
 
-<div class="card">
-  <h2>Exam Result</h2>
-  <div id="resultInfo">Loading...</div>
-  <button onclick="goHome()">Back to Home</button>
-</div>
+  <!-- HEADER -->
+  <header class="header">
+    <h2>Exam Result</h2>
+  </header>
 
-<script src="student-result.js"></script>
+  <!-- RESULT CONTAINER (🔥 MUST MATCH JS) -->
+  <main class="container">
+    <div id="resultContainer">
+      <div class="card center muted">Loading result…</div>
+    </div>
+  </main>
+
+  <script src="student-result.js"></script>
 </body>
 </html>

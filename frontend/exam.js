@@ -1,192 +1,224 @@
-// ================= BASIC DATA =================
-let violationCount = 0;
-const MAX_VIOLATIONS = 3;
+// ================= UTILS =================
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
+// ================= STATE =================
+let questions = [];
+let answers = [];
 let remainingSeconds = 0;
 let timerInterval = null;
 let examSubmitted = false;
+
+let violationCount = 0;
+const MAX_VIOLATIONS = 3;
 
 const testId = localStorage.getItem("testId");
 const studentName = localStorage.getItem("studentName");
 const studentReg = localStorage.getItem("studentReg");
 
-let questions = [];
-let answers = [];
+if (!testId || !studentReg) location.href = "/";
 
-// ================= SAFETY CHECK =================
-if (!testId || !studentReg) {
-  alert("Invalid exam session. Please re-enter the test.");
-  window.location.href = "/student.html";
+// ================= FORCE TIMER VISIBILITY =================
+function forceTimerVisible() {
+  const el = document.getElementById("timer");
+  if (!el) return;
+
+  el.style.display = "block";
+  el.style.visibility = "visible";
+  el.style.opacity = "1";
+  el.style.color = "#000";
+  el.style.fontWeight = "bold";
+  el.style.zIndex = "99999";
 }
 
-// ================= SECURITY =================
-function registerViolation(reason) {
+// ================= WARNING UI =================
+function showWarning(reason) {
   if (examSubmitted) return;
 
   violationCount++;
 
-  alert(`Warning ${violationCount}/${MAX_VIOLATIONS}\n${reason}`);
-
-  // Log violation (optional backend)
-  fetch("/api/exam/violation", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ testId, studentReg, reason, count: violationCount })
-  }).catch(() => {});
+  const box = document.getElementById("warningBox");
+  box.querySelector("p").innerText =
+    `⚠️ ${reason}\nWarning ${violationCount}/${MAX_VIOLATIONS}`;
+  box.style.display = "flex";
 
   if (violationCount >= MAX_VIOLATIONS) {
-    autoSubmit("Multiple violations detected");
+    setTimeout(finalSubmit, 1000);
   }
 }
 
-// ================= FULLSCREEN =================
-function enterFullscreen() {
-  const el = document.documentElement;
-  if (el.requestFullscreen && !document.fullscreenElement) {
-    el.requestFullscreen().catch(() => {});
-  }
+function closeWarning() {
+  document.getElementById("warningBox").style.display = "none";
 }
 
-let fullscreenInitialized = false;
-
-document.addEventListener("fullscreenchange", () => {
-  if (!fullscreenInitialized || examSubmitted) return;
-
-  if (!document.fullscreenElement) {
-    registerViolation("Exited fullscreen mode");
-    setTimeout(enterFullscreen, 500);
-  }
-});
-
-// ================= TAB SWITCH =================
+// ================= SECURITY =================
 document.addEventListener("visibilitychange", () => {
-  if (!examSubmitted && document.hidden) {
-    registerViolation("Tab switched");
-  }
+  if (document.hidden) showWarning("Tab switching detected");
 });
-
-// ================= COPY / PASTE =================
-document.addEventListener("contextmenu", e => e.preventDefault());
 
 document.addEventListener("keydown", e => {
   if (e.ctrlKey && ["c", "v", "x"].includes(e.key.toLowerCase())) {
     e.preventDefault();
-    registerViolation("Copy/Paste attempt");
+    showWarning("Copy / Paste detected");
   }
+});
+
+document.addEventListener("contextmenu", e => {
+  e.preventDefault();
+  showWarning("Right click disabled");
+});
+
+window.addEventListener("blur", () => {
+  showWarning("App switched / minimized");
 });
 
 // ================= TIMER =================
 function startTimer() {
-  updateTimerUI();
+  if (timerInterval) clearInterval(timerInterval);
+
+  forceTimerVisible();
+  updateTimer();
 
   timerInterval = setInterval(() => {
-    if (examSubmitted) {
-      clearInterval(timerInterval);
-      return;
-    }
-
     remainingSeconds--;
+    updateTimer();
 
     if (remainingSeconds <= 0) {
       clearInterval(timerInterval);
-      autoSubmit("Time is up");
-      return;
+      finalSubmit();
     }
-
-    updateTimerUI();
   }, 1000);
 }
 
-function updateTimerUI() {
+function updateTimer() {
   const el = document.getElementById("timer");
   if (!el) return;
 
   const m = Math.floor(remainingSeconds / 60);
   const s = remainingSeconds % 60;
-  el.innerText = `Time: ${m}:${String(s).padStart(2, "0")}`;
+
+  el.textContent = `Time: ${m}:${String(s).padStart(2, "0")}`;
 }
 
 // ================= LOAD EXAM =================
 async function loadExam() {
+  forceTimerVisible();
+
+  // TEMP timer so user ALWAYS sees something
+  remainingSeconds = 30 * 60;
+  startTimer();
+
+  let test;
   try {
     const res = await fetch(`/api/tests/${testId}`);
-    if (!res.ok) throw new Error("Test not found");
-
-    const data = await res.json();
-
-    questions = data.questions || [];
-    answers = new Array(questions.length).fill(null);
-
-    remainingSeconds = (data.duration || 30) * 60;
-    startTimer();
-
-    const container = document.getElementById("examContainer");
-    container.innerHTML = "";
-
-    questions.forEach((q, i) => {
-      const div = document.createElement("div");
-      div.className = "question";
-     div.innerHTML = `<h3>Q${i + 1}. ${q.question}</h3>`;
-
-
-      q.options.forEach((opt, idx) => {
-        const label = document.createElement("label");
-        label.className = "option";
-
-        label.innerHTML = `
-          <span>${opt}</span>
-          <input type="radio" name="q${i}">
-        `;
-
-        label.querySelector("input").onchange = () => {
-          answers[i] = idx;
-        };
-
-        div.appendChild(label);
-      });
-
-      container.appendChild(div);
-    });
-
-    fullscreenInitialized = true;
-  } catch (err) {
-    document.getElementById("examContainer").innerHTML =
-      "<p>Failed to load exam.</p>";
-    console.error(err);
+    if (!res.ok) throw new Error();
+    test = await res.json();
+  } catch {
+    showWarning("Failed to load exam");
+    return;
   }
+
+  questions = shuffleArray(test.questions || []);
+  answers = questions.map(q => (q.type === "MSQ" ? [] : null));
+
+  remainingSeconds = (test.duration || 30) * 60;
+  startTimer();
+
+  const container = document.getElementById("examContainer");
+  container.innerHTML = "";
+
+  questions.forEach((q, qi) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.marginBottom = "16px";
+
+    let html = `<h4>Q${qi + 1}. ${q.question}</h4>`;
+
+    if (q.image) {
+      html += `<img src="${q.image}" style="max-width:100%;margin:10px 0">`;
+    }
+
+    if (q.type === "MCQ" || q.type === "MSQ") {
+      shuffleArray(q.options.map((o, i) => ({ o, i }))).forEach(({ o, i }) => {
+        html += `
+          <label class="option" style="justify-content:space-between">
+            <span>${o}</span>
+            <input type="${q.type === "MCQ" ? "radio" : "checkbox"}"
+                   name="q${qi}" data-index="${i}">
+          </label>
+        `;
+      });
+    }
+
+    if (q.type === "NAT") {
+      html += `
+        <input type="number"
+               placeholder="Enter numeric answer"
+               style="width:100%;padding:12px;margin-top:10px">
+      `;
+    }
+
+    card.innerHTML = html;
+    container.appendChild(card);
+
+    card.querySelectorAll("input").forEach(inp => {
+      inp.onchange = () => {
+        const idx = Number(inp.dataset.index);
+        if (q.type === "MCQ") answers[qi] = idx;
+        if (q.type === "MSQ") {
+          answers[qi] = answers[qi] || [];
+          inp.checked
+            ? answers[qi].push(idx)
+            : answers[qi] = answers[qi].filter(x => x !== idx);
+        }
+        if (q.type === "NAT") answers[qi] = Number(inp.value);
+      };
+    });
+  });
 }
 
 // ================= SUBMIT =================
-function submitExam() {
-  if (examSubmitted) return;
+function confirmSubmit() {
+  document.getElementById("confirmBox").style.display = "flex";
+}
 
+function cancelSubmit() {
+  document.getElementById("confirmBox").style.display = "none";
+}
+
+async function finalSubmit() {
+  if (examSubmitted) return;
   examSubmitted = true;
   clearInterval(timerInterval);
 
-  fetch("/api/exam/submit", {
+  await fetch("/api/exam/submit", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ testId, studentName, studentReg, answers })
-  })
-    .then(res => res.json())
-    .then(data => {
-      // ✅ mark attempt
-      localStorage.setItem("attempted", "yes");
-      localStorage.setItem("lastResult", JSON.stringify(data));
-
-      alert(`Exam submitted!\nScore: ${data.score}/${data.total}`);
-      window.location.href = "/student-result.html";
+    body: JSON.stringify({
+      testId,
+      studentName,
+      studentReg,
+      answers
     })
-    .catch(() => alert("Submission failed"));
-}
+  });
 
-function autoSubmit(reason) {
-  if (examSubmitted) return;
-  alert(reason);
-  submitExam();
+  document.body.innerHTML = `
+    <div class="container center">
+      <div class="card">
+        <h2>Exam Finished</h2>
+        <p class="muted">Thank you. You may leave.</p>
+        <br>
+        <button onclick="location.href='/'">Leave</button>
+      </div>
+    </div>
+  `;
 }
 
 // ================= START =================
-enterFullscreen();
-setTimeout(() => (fullscreenInitialized = true), 1000);
-loadExam();
+document.addEventListener("DOMContentLoaded", loadExam);

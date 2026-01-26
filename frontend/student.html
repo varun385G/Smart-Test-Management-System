@@ -1,18 +1,51 @@
-<h2>Enter Test</h2>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Student Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css">
-<link rel="stylesheet" href="ui.css">
-<link rel="stylesheet" href="responsive.css">
-<link rel="stylesheet" href="app.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="responsive.css">
+  <link rel="stylesheet" href="app.css">
+</head>
 
-<input id="testId" placeholder="Test ID"><br><br>
-<input id="password" placeholder="Test Password"><br><br>
-<input id="name" placeholder="Your Name"><br><br>
-<input id="reg" placeholder="Register Number"><br><br>
+<body>
 
-<button onclick="enterTest()">Enter</button>
+<header class="header">
+  <h2>Enter Test</h2>
+</header>
+
+<main class="container">
+
+  <!-- STUDENT FORM -->
+  <form id="studentForm" class="card">
+
+    <input id="testId" placeholder="Test ID" required>
+    <br><br>
+
+    <input id="password" placeholder="Test Password" required>
+    <br><br>
+
+    <input id="name" placeholder="Your Name" required>
+    <br><br>
+
+    <input id="reg" placeholder="Register Number" required>
+    <br><br>
+
+    <button type="submit">Enter Exam</button>
+
+  </form>
+
+  <br>
+
+  <!-- MESSAGE AREA (IMPORTANT) -->
+  <div id="messageBox"></div>
+
+</main>
 
 <script src="student.js"></script>
-
+</body>
+</html>

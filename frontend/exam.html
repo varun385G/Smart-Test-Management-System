@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, user-scalable=no">
 
   <title>Online Examination</title>
 
@@ -10,60 +11,68 @@
   <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="responsive.css">
   <link rel="stylesheet" href="app.css">
-
-  <style>
-    .timer {
-      color: #dc2626;
-      font-weight: 600;
-      margin-top: 4px;
-    }
-
-    .question {
-      margin-bottom: 16px;
-    }
-
-    .option {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px;
-      border-radius: 10px;
-      border: 1px solid #e5e7eb;
-      margin-top: 10px;
-      cursor: pointer;
-      transition: background 0.2s ease;
-    }
-
-    .option:hover {
-      background: #eef2ff;
-    }
-
-    .option input {
-      transform: scale(1.2);
-    }
-  </style>
 </head>
 
 <body>
 
-  <!-- HEADER -->
-  <header class="header">
-    <div>
-      <h2>Online Examination</h2>
-      <div id="timer" class="timer">Time: --:--</div>
-    </div>
-  </header>
-
-  <!-- MAIN -->
-  <main class="container" id="examContainer">
-    <div class="card center muted">Loading exam…</div>
-  </main>
-
-  <!-- SUBMIT -->
-  <div class="container">
-    <button class="danger" onclick="submitExam()">Submit Exam</button>
+<!-- HEADER -->
+<header class="header">
+  <div>
+    <h2>Online Examination</h2>
+    <div id="timer" class="timer">Time: --:--</div>
   </div>
+</header>
 
-  <script src="exam.js"></script>
+<!-- EXAM -->
+<main class="container" id="examContainer">
+  <div class="card center muted">Loading exam…</div>
+</main>
+
+<!-- SUBMIT (ONLY ONE) -->
+<div class="container">
+  <button class="danger" onclick="confirmSubmit()">Submit Exam</button>
+</div>
+
+<!-- CONFIRM BOX -->
+<div id="confirmBox" style="
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.6);
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+">
+  <div class="card center">
+    <h3>Confirm Submission</h3>
+    <p class="muted">
+      Are you sure? You cannot re-attempt this exam.
+    </p>
+    <br>
+    <button class="danger" onclick="finalSubmit()">Yes, Submit</button>
+    <button class="secondary" onclick="cancelSubmit()">Cancel</button>
+  </div>
+</div>
+
+<!-- WARNING BOX -->
+<div id="warningBox" style="
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.6);
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+">
+  <div class="card center" style="max-width:360px">
+    <h3>Security Warning</h3>
+    <p class="muted"></p>
+    <br>
+    <button onclick="closeWarning()">Close</button>
+  </div>
+</div>
+
+<script src="exam.js" defer></script>
+
 </body>
 </html>
