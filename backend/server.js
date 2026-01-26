@@ -47,6 +47,51 @@ app.post("/api/staff/login", async (req, res) => {
   });
 });
 
+/* ================= ADMIN: CREATE STAFF ================= */
+app.post("/api/admin/create-staff", async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+
+    const exists = await Staff.findOne({ email });
+    if (exists) {
+      return res.status(409).json({ message: "Staff already exists" });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    const staff = await Staff.create({
+      name,
+      email,
+      password: hashed,
+      role: role || "staff"
+    });
+
+    res.json({
+      message: "Staff created",
+      staffId: staff._id
+    });
+  } catch (err) {
+    console.error("CREATE STAFF ERROR:", err);
+    res.status(500).json({ message: "Failed to create staff" });
+  }
+});
+
+/* ================= ADMIN: VIEW STAFF ================= */
+app.get("/api/admin/staff", async (req, res) => {
+  const staff = await Staff.find({}, "-password").sort({ createdAt: -1 });
+  res.json(staff);
+});
+
+/* ================= ADMIN: DELETE STAFF ================= */
+app.delete("/api/admin/staff/:id", async (req, res) => {
+  await Staff.findByIdAndDelete(req.params.id);
+  res.json({ message: "Staff deleted" });
+});
+
 /* ================= CREATE TEST ================= */
 function generateTestId() {
   return "ST-" + Math.floor(100000 + Math.random() * 900000);
@@ -146,7 +191,6 @@ app.post("/api/exam/submit", async (req, res) => {
     const test = await Test.findOne({ testId });
     if (!test) return res.status(404).json({ message: "Test not found" });
 
-    // ⛔ Block re-attempt
     const exists = await Result.findOne({ testId, studentReg });
     if (exists) return res.json({ message: "Already submitted" });
 
@@ -167,7 +211,6 @@ app.post("/api/exam/submit", async (req, res) => {
       if (q.type === "NAT" && ans === q.correctValue) score++;
     });
 
-    // 🔥 Normalize answers before save
     const safeAnswers = answers.map(a =>
       Array.isArray(a) ? [...a] : a
     );
@@ -228,15 +271,14 @@ app.get("/api/admin/results/grouped", async (req, res) => {
   });
 
   tests.forEach(t => {
-  if (!t.createdBy || !grouped[t.createdBy._id.toString()]) return;
+    if (!t.createdBy || !grouped[t.createdBy._id.toString()]) return;
 
-  grouped[t.createdBy._id.toString()].tests[t.testId] = {
-    testTitle: t.title,
-    resultsPublished: t.resultsPublished,
-    results: []
-  };
-});
-
+    grouped[t.createdBy._id.toString()].tests[t.testId] = {
+      testTitle: t.title,
+      resultsPublished: t.resultsPublished,
+      results: []
+    };
+  });
 
   results.forEach(r => {
     Object.values(grouped).forEach(s => {
