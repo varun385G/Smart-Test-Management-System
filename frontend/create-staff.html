@@ -19,7 +19,10 @@
 <input id="email" placeholder="Staff Email"><br><br>
 <input id="password" type="password" placeholder="Password"><br><br>
 
-<button onclick="createStaff()">Create Staff</button>
+<div class="admin-only">
+  <button onclick="createStaff()">Create Staff</button>
+</div>
+
 
 <p id="msg"></p>
 
