@@ -1,28 +1,63 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css">
-<link rel="stylesheet" href="ui.css">
-<link rel="stylesheet" href="responsive.css">
-<link rel="stylesheet" href="app.css">
-
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Student Dashboard</title>
+
+  <!-- Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="responsive.css">
+  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="modern-theme.css">
 </head>
-<body>
 
-<h1>Student Dashboard</h1>
+<body class="modern-ui">
 
-<p>Name: <span id="name"></span></p>
-<p>Test ID: <span id="testId"></span></p>
-<p>Status: <span id="status"></span></p>
+  <!-- PAGE WRAPPER -->
+  <main class="container" style="padding:24px;">
 
-<button id="startBtn">Start Exam</button>
-<button id="resultBtn">View Result</button>
+    <!-- HEADER CARD -->
+    <section class="card" style="margin-bottom:20px;">
+      <h2 style="margin-top:0;">Student Dashboard</h2>
+      <p style="color:var(--muted); margin-bottom:0;">
+        Welcome. Check your test details below.
+      </p>
+    </section>
 
-<script src="student-dashboard.js"></script>
+    <!-- INFO CARD -->
+    <section class="card" style="margin-bottom:20px;">
+
+      <p><strong>Name:</strong> <span id="name"></span></p>
+      <p><strong>Test ID:</strong> <span id="testId"></span></p>
+      <p>
+        <strong>Status:</strong>
+        <span id="status" style="font-weight:600;"></span>
+      </p>
+
+    </section>
+
+    <!-- ACTIONS CARD -->
+    <section class="card">
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <button id="startBtn" class="btn btn-primary">
+          Start Exam
+        </button>
+
+        <button id="resultBtn" class="btn">
+          View Result
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- SCRIPT -->
+  <script src="student-dashboard.js"></script>
+
 </body>
 </html>

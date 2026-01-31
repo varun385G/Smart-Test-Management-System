@@ -24,7 +24,7 @@ const studentReg = localStorage.getItem("studentReg");
 
 if (!testId || !studentReg) location.href = "/";
 
-// ================= FORCE TIMER VISIBILITY =================
+// ================= TIMER VISIBILITY =================
 function forceTimerVisible() {
   const el = document.getElementById("timer");
   if (!el) return;
@@ -32,9 +32,7 @@ function forceTimerVisible() {
   el.style.display = "block";
   el.style.visibility = "visible";
   el.style.opacity = "1";
-  el.style.color = "#000";
-  el.style.fontWeight = "bold";
-  el.style.zIndex = "99999";
+  el.style.fontWeight = "600";
 }
 
 // ================= WARNING UI =================
@@ -44,8 +42,11 @@ function showWarning(reason) {
   violationCount++;
 
   const box = document.getElementById("warningBox");
-  box.querySelector("p").innerText =
-    `⚠️ ${reason}\nWarning ${violationCount}/${MAX_VIOLATIONS}`;
+  const text = box.querySelector("p");
+
+  text.innerText =
+    `${reason}\nWarning ${violationCount} of ${MAX_VIOLATIONS}`;
+
   box.style.display = "flex";
 
   if (violationCount >= MAX_VIOLATIONS) {
@@ -65,22 +66,34 @@ document.addEventListener("visibilitychange", () => {
 document.addEventListener("keydown", e => {
   if (e.ctrlKey && ["c", "v", "x"].includes(e.key.toLowerCase())) {
     e.preventDefault();
-    showWarning("Copy / Paste detected");
+    showWarning("Copy or paste detected");
   }
 });
 
 document.addEventListener("contextmenu", e => {
   e.preventDefault();
-  showWarning("Right click disabled");
+  showWarning("Right click blocked");
 });
 
+window.addEventListener("popstate", e => {
+  e.preventDefault();
+  showWarning("Back navigation blocked");
+});
+
+
+window.addEventListener("beforeunload", e => {
+  e.preventDefault();
+  e.returnValue= "";
+});
+
+
 window.addEventListener("blur", () => {
-  showWarning("App switched / minimized");
+  showWarning("App minimized or switched");
 });
 
 // ================= TIMER =================
 function startTimer() {
-  if (timerInterval) clearInterval(timerInterval);
+  clearInterval(timerInterval);
 
   forceTimerVisible();
   updateTimer();
@@ -103,14 +116,13 @@ function updateTimer() {
   const m = Math.floor(remainingSeconds / 60);
   const s = remainingSeconds % 60;
 
-  el.textContent = `Time: ${m}:${String(s).padStart(2, "0")}`;
+  el.textContent = `Time. ${m}:${String(s).padStart(2, "0")}`;
 }
 
 // ================= LOAD EXAM =================
 async function loadExam() {
   forceTimerVisible();
 
-  // TEMP timer so user ALWAYS sees something
   remainingSeconds = 30 * 60;
   startTimer();
 
@@ -147,10 +159,13 @@ async function loadExam() {
     if (q.type === "MCQ" || q.type === "MSQ") {
       shuffleArray(q.options.map((o, i) => ({ o, i }))).forEach(({ o, i }) => {
         html += `
-          <label class="option" style="justify-content:space-between">
+          <label class="option" style="display:flex; gap:10px; margin-top:8px;">
+            <input
+              type="${q.type === "MCQ" ? "radio" : "checkbox"}"
+              name="q${qi}"
+              data-index="${i}"
+            >
             <span>${o}</span>
-            <input type="${q.type === "MCQ" ? "radio" : "checkbox"}"
-                   name="q${qi}" data-index="${i}">
           </label>
         `;
       });
@@ -158,9 +173,11 @@ async function loadExam() {
 
     if (q.type === "NAT") {
       html += `
-        <input type="number"
-               placeholder="Enter numeric answer"
-               style="width:100%;padding:12px;margin-top:10px">
+        <input
+          type="number"
+          placeholder="Enter numeric answer"
+          style="width:100%;padding:12px;margin-top:10px"
+        >
       `;
     }
 
@@ -170,13 +187,16 @@ async function loadExam() {
     card.querySelectorAll("input").forEach(inp => {
       inp.onchange = () => {
         const idx = Number(inp.dataset.index);
+
         if (q.type === "MCQ") answers[qi] = idx;
+
         if (q.type === "MSQ") {
           answers[qi] = answers[qi] || [];
           inp.checked
             ? answers[qi].push(idx)
             : answers[qi] = answers[qi].filter(x => x !== idx);
         }
+
         if (q.type === "NAT") answers[qi] = Number(inp.value);
       };
     });
@@ -194,6 +214,7 @@ function cancelSubmit() {
 
 async function finalSubmit() {
   if (examSubmitted) return;
+
   examSubmitted = true;
   clearInterval(timerInterval);
 
@@ -209,10 +230,10 @@ async function finalSubmit() {
   });
 
   document.body.innerHTML = `
-    <div class="container center">
+    <div class="container center" style="padding:24px;">
       <div class="card">
         <h2>Exam Finished</h2>
-        <p class="muted">Thank you. You may leave.</p>
+        <p style="color:var(--muted);">Thank you. You may leave.</p>
         <br>
         <button onclick="location.href='/'">Leave</button>
       </div>

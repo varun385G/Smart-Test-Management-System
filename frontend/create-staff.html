@@ -1,33 +1,77 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>Create Staff</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!-- Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="ui.css">
+  <link rel="stylesheet" href="responsive.css">
+  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="modern-theme.css">
 </head>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css">
-<link rel="stylesheet" href="ui.css">
-<link rel="stylesheet" href="responsive.css">
-<link rel="stylesheet" href="app.css">
 
-<body>
+<body class="modern-ui">
 
-<h2>Create Staff Account</h2>
+  <!-- PAGE CONTAINER -->
+  <main class="container" style="padding:24px; max-width:520px; margin:auto;">
 
-<input id="name" placeholder="Staff Name"><br><br>
-<input id="email" placeholder="Staff Email"><br><br>
-<input id="password" type="password" placeholder="Password"><br><br>
+    <!-- HEADER -->
+    <section class="card" style="margin-bottom:20px;">
+      <h2 style="margin-top:0;">Create Staff Account</h2>
+      <p style="color:var(--muted); margin-bottom:0;">
+        Add a new staff member to the system
+      </p>
+    </section>
 
-<div class="admin-only">
-  <button onclick="createStaff()">Create Staff</button>
-</div>
+    <!-- FORM CARD -->
+    <section class="card">
 
+      <label>
+        Staff Name
+        <input id="name" placeholder="Enter staff name" style="width:100%; margin-top:6px;">
+      </label>
 
-<p id="msg"></p>
+      <br>
 
-<button onclick="goBack()">⬅ Back</button>
+      <label>
+        Staff Email
+        <input id="email" placeholder="Enter staff email" style="width:100%; margin-top:6px;">
+      </label>
 
-<script src="create-staff.js"></script>
+      <br>
+
+      <label>
+        Password
+        <input id="password" type="password" placeholder="Enter password" style="width:100%; margin-top:6px;">
+      </label>
+
+      <br>
+
+      <div class="admin-only" style="margin-top:12px;">
+        <button class="btn btn-primary" onclick="createStaff()">
+          Create Staff
+        </button>
+      </div>
+
+      <p id="msg" style="margin-top:12px;"></p>
+
+    </section>
+
+    <!-- BACK BUTTON -->
+    <section style="margin-top:16px;">
+      <button class="btn" onclick="goBack()">Back</button>
+    </section>
+
+  </main>
+
+  <!-- SCRIPT -->
+  <script src="create-staff.js"></script>
+
 </body>
 </html>

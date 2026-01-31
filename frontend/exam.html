@@ -2,77 +2,118 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, user-scalable=no"
+  >
 
   <title>Online Examination</title>
 
+  <!-- Styles -->
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="responsive.css">
   <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="modern-theme.css">
 </head>
 
-<body>
+<body class="modern-ui">
 
-<!-- HEADER -->
-<header class="header">
-  <div>
-    <h2>Online Examination</h2>
-    <div id="timer" class="timer">Time: --:--</div>
+  <!-- HEADER -->
+  <header class="card" style="margin:16px;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">Online Examination</h2>
+      <div id="timer" style="font-weight:600;">
+        Time. --:--
+      </div>
+    </div>
+  </header>
+
+  <!-- EXAM CONTAINER -->
+  <main
+    class="container"
+    id="examContainer"
+    style="padding:16px; max-width:1000px; margin:auto;"
+  >
+    <div class="card center" style="color:var(--muted);">
+      Loading exam...
+    </div>
+  </main>
+
+  <!-- SUBMIT BAR -->
+  <div
+    class="card"
+    style="
+      position:fixed;
+      bottom:0;
+      left:0;
+      right:0;
+      padding:12px;
+      display:flex;
+      justify-content:center;
+      background:var(--card);
+      box-shadow:0 -6px 20px rgba(0,0,0,0.08);
+    "
+  >
+    <button class="btn btn-primary" onclick="confirmSubmit()">
+      Submit Exam
+    </button>
   </div>
-</header>
 
-<!-- EXAM -->
-<main class="container" id="examContainer">
-  <div class="card center muted">Loading exam…</div>
-</main>
-
-<!-- SUBMIT (ONLY ONE) -->
-<div class="container">
-  <button class="danger" onclick="confirmSubmit()">Submit Exam</button>
-</div>
-
-<!-- CONFIRM BOX -->
-<div id="confirmBox" style="
-  display:none;
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,0.6);
-  align-items:center;
-  justify-content:center;
-  z-index:9999;
-">
-  <div class="card center">
-    <h3>Confirm Submission</h3>
-    <p class="muted">
-      Are you sure? You cannot re-attempt this exam.
-    </p>
-    <br>
-    <button class="danger" onclick="finalSubmit()">Yes, Submit</button>
-    <button class="secondary" onclick="cancelSubmit()">Cancel</button>
+  <!-- CONFIRM BOX -->
+  <div
+    id="confirmBox"
+    style="
+      display:none;
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.6);
+      align-items:center;
+      justify-content:center;
+      z-index:9999;
+    "
+  >
+    <div class="card center" style="max-width:380px;">
+      <h3>Confirm Submission</h3>
+      <p style="color:var(--muted);">
+        Are you sure. You cannot re attempt this exam.
+      </p>
+      <br>
+      <button class="btn btn-primary" onclick="finalSubmit()">
+        Yes. Submit
+      </button>
+      <br><br>
+      <button class="btn" onclick="cancelSubmit()">
+        Cancel
+      </button>
+    </div>
   </div>
-</div>
 
-<!-- WARNING BOX -->
-<div id="warningBox" style="
-  display:none;
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,0.6);
-  align-items:center;
-  justify-content:center;
-  z-index:9999;
-">
-  <div class="card center" style="max-width:360px">
-    <h3>Security Warning</h3>
-    <p class="muted"></p>
-    <br>
-    <button onclick="closeWarning()">Close</button>
+  <!-- WARNING BOX -->
+  <div
+    id="warningBox"
+    style="
+      display:none;
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.6);
+      align-items:center;
+      justify-content:center;
+      z-index:9999;
+    "
+  >
+    <div class="card center" style="max-width:360px;">
+      <h3>Security Warning</h3>
+      <p class="muted"></p>
+      <br>
+      <button class="btn btn-primary" onclick="closeWarning()">
+        Close
+      </button>
+    </div>
   </div>
-</div>
 
-<script src="exam.js" defer></script>
+  <!-- SCRIPT -->
+  <script src="exam.js" defer></script>
 
 </body>
 </html>

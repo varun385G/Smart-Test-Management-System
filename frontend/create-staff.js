@@ -6,28 +6,52 @@ if (role !== "admin") {
 }
 
 async function createStaff() {
-  const name = document.getElementById("name").value.trim();
-  const email = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value.trim();
+  const nameInput = document.getElementById("name");
+  const emailInput = document.getElementById("email");
+  const passwordInput = document.getElementById("password");
+  const msg = document.getElementById("msg");
+
+  const name = nameInput.value.trim();
+  const email = emailInput.value.trim();
+  const password = passwordInput.value.trim();
+
+  msg.innerText = "";
+  msg.style.color = "";
 
   if (!name || !email || !password) {
-    document.getElementById("msg").innerText = "All fields required";
+    msg.innerText = "All fields required";
+    msg.style.color = "#dc2626";
     return;
   }
 
-  const res = await fetch("/api/admin/create-staff", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, email, password })
-  });
+  const btn = document.querySelector(".admin-only button");
+  btn.disabled = true;
+  btn.style.opacity = "0.6";
+  btn.innerText = "Creating...";
 
-  const data = await res.json();
+  try {
+    const res = await fetch("/api/admin/create-staff", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password })
+    });
 
-  if (res.ok) {
-    alert("Staff created successfully");
-    window.location.href = "/dashboard.html";
-  } else {
-    document.getElementById("msg").innerText = data.message;
+    const data = await res.json();
+
+    if (res.ok) {
+      alert("Staff created successfully");
+      window.location.href = "/dashboard.html";
+    } else {
+      msg.innerText = data.message || "Failed to create staff";
+      msg.style.color = "#dc2626";
+    }
+  } catch (err) {
+    msg.innerText = "Network error. Try again.";
+    msg.style.color = "#dc2626";
+  } finally {
+    btn.disabled = false;
+    btn.style.opacity = "1";
+    btn.innerText = "Create Staff";
   }
 }
 

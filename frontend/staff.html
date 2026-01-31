@@ -1,71 +1,99 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Staff Login</title>
 
-  <!-- ✅ KEEP ORIGINAL UI -->
+  <!-- Styles -->
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="responsive.css">
-<link rel="stylesheet" href="app.css">
-
+  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="modern-theme.css">
 </head>
 
-<body>
+<body class="modern-ui">
 
-<h2>Staff Login</h2>
+  <!-- PAGE CONTAINER -->
+  <main class="container" style="padding:24px; max-width:420px; margin:auto;">
 
-<input id="email" type="email" placeholder="Email"><br><br>
-<input id="password" type="password" placeholder="Password"><br><br>
+    <!-- LOGIN CARD -->
+    <section class="card">
 
-<button onclick="login()">Login</button>
+      <h2 style="margin-top:0;">Staff Login</h2>
+      <p style="color:var(--muted);">
+        Enter your staff credentials to continue
+      </p>
 
-<p id="msg" style="color:red;"></p>
+      <input
+        id="email"
+        type="email"
+        placeholder="Email"
+        style="width:100%; margin-bottom:12px;"
+      >
 
-<script>
-async function login() {
-  const email = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value.trim();
-  const msg = document.getElementById("msg");
+      <input
+        id="password"
+        type="password"
+        placeholder="Password"
+        style="width:100%; margin-bottom:12px;"
+      >
 
-  msg.innerText = "";
+      <button
+        class="btn btn-primary"
+        style="width:100%;"
+        onclick="login()"
+      >
+        Login
+      </button>
 
-  if (!email || !password) {
-    msg.innerText = "Please enter email and password";
-    return;
-  }
+      <p id="msg" style="color:#dc2626; margin-top:12px;"></p>
 
-  try {
-    const res = await fetch("/api/staff/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
+    </section>
 
-    const data = await res.json();
+  </main>
 
-    if (!res.ok) {
-      msg.innerText = data.message || "Login failed";
-      return;
+  <!-- SCRIPT -->
+  <script>
+    async function login() {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const msg = document.getElementById("msg");
+
+      msg.innerText = "";
+
+      if (!email || !password) {
+        msg.innerText = "Please enter email and password";
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/staff/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          msg.innerText = data.message || "Login failed";
+          return;
+        }
+
+        localStorage.setItem("staffId", data.staffId);
+        localStorage.setItem("staffName", data.name);
+        localStorage.setItem("staffRole", data.role);
+
+        window.location.href = "/dashboard.html";
+
+      } catch (err) {
+        console.error(err);
+        msg.innerText = "Server error. Try again.";
+      }
     }
-
-    // ✅ STORE CORRECT KEYS
-    localStorage.setItem("staffId", data.staffId);
-    localStorage.setItem("staffName", data.name);
-    localStorage.setItem("staffRole", data.role);
-
-    // ✅ SAME DASHBOARD AS BEFORE
-    window.location.href = "/dashboard.html";
-
-  } catch (err) {
-    console.error(err);
-    msg.innerText = "Server error. Try again.";
-  }
-}
-</script>
+  </script>
 
 </body>
 </html>

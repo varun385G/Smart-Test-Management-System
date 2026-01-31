@@ -4,9 +4,11 @@ function goBack() {
   location.href = "/dashboard.html";
 }
 
-/* ================= COPY TEST ID (GLOBAL) ================= */
+/* ================= COPY TEST ID ================= */
 function copyTestId() {
   const text = document.getElementById("createdTestId").innerText;
+
+  if (!text) return;
 
   if (navigator.clipboard && window.isSecureContext) {
     navigator.clipboard.writeText(text)
@@ -39,13 +41,13 @@ function addQuestion() {
     <h4>Question ${questionCount}</h4>
 
     <select class="q-type">
-      <option value="MCQ">MCQ (Single Correct)</option>
-      <option value="MSQ">MSQ (Multiple Correct)</option>
-      <option value="NAT">NAT (Numeric Answer)</option>
+      <option value="MCQ">MCQ Single Correct</option>
+      <option value="MSQ">MSQ Multiple Correct</option>
+      <option value="NAT">NAT Numeric Answer</option>
     </select>
 
     <input class="q-text" placeholder="Question text">
-    <input class="q-image" placeholder="Image URL (optional)">
+    <input class="q-image" placeholder="Image URL optional">
 
     <div class="options"></div>
     <input class="nat-answer" type="number"
@@ -64,7 +66,7 @@ function addQuestion() {
     if (type === "MCQ" || type === "MSQ") {
       for (let i = 0; i < 4; i++) {
         optionsDiv.innerHTML += `
-          <label style="display:flex;gap:10px;margin-top:8px">
+          <label style="display:flex; gap:10px; margin-top:8px;">
             <input type="${type === "MCQ" ? "radio" : "checkbox"}"
                    name="q${questionCount}">
             <input class="opt" placeholder="Option ${String.fromCharCode(65 + i)}">
@@ -86,13 +88,18 @@ function addQuestion() {
 
 /* ================= SAVE TEST ================= */
 async function saveTest() {
+  const saveBtn = document.querySelector("button[onclick='saveTest()']");
+  saveBtn.disabled = true;
+  saveBtn.style.opacity = "0.6";
+  saveBtn.innerText = "Saving...";
+
   try {
     const title = document.getElementById("title").value.trim();
     const password = document.getElementById("password").value.trim();
     const duration = Number(document.getElementById("duration").value);
 
     if (!title || !password || !duration) {
-      alert("Title, password and duration are required");
+      alert("Title, password, and duration are required");
       return;
     }
 
@@ -113,7 +120,7 @@ async function saveTest() {
         const correctIndex = [...radios].findIndex(r => r.checked);
 
         if (opts.some(o => !o) || correctIndex === -1)
-          throw "Fill MCQ options and select correct answer";
+          throw "Fill MCQ options and select one correct answer";
 
         qObj.options = opts;
         qObj.correctIndex = correctIndex;
@@ -127,7 +134,7 @@ async function saveTest() {
           .filter(i => i !== -1);
 
         if (opts.some(o => !o) || correctIndexes.length === 0)
-          throw "Fill MSQ options and select at least one correct answer";
+          throw "Fill MSQ options and select answers";
 
         qObj.options = opts;
         qObj.correctIndexes = correctIndexes;
@@ -159,12 +166,15 @@ async function saveTest() {
     const data = await res.json();
     if (!res.ok) throw data.message;
 
-    // ✅ SHOW SUCCESS UI
     document.getElementById("successBox").style.display = "block";
     document.getElementById("createdTestId").innerText = data.testId;
     document.querySelector("main").style.display = "none";
 
   } catch (err) {
     alert(err);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.style.opacity = "1";
+    saveBtn.innerText = "Save Test";
   }
 }

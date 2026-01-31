@@ -1,23 +1,37 @@
 console.log("student-dashboard.js loaded");
 
+const nameEl = document.getElementById("name");
+const testIdEl = document.getElementById("testId");
+const statusEl = document.getElementById("status");
+const startBtn = document.getElementById("startBtn");
+const resultBtn = document.getElementById("resultBtn");
+
 const studentName = localStorage.getItem("studentName");
 const testId = localStorage.getItem("testId");
 const attempted = localStorage.getItem("attempted");
 
-document.getElementById("name").innerText = studentName || "N/A";
-document.getElementById("testId").innerText = testId || "N/A";
+/* Fill data safely */
+nameEl.innerText = studentName || "N/A";
+testIdEl.innerText = testId || "N/A";
 
+/* Status handling */
 if (attempted === "yes") {
-  document.getElementById("status").innerText = "Attempted";
-  document.getElementById("startBtn").disabled = true;
+  statusEl.innerText = "Attempted";
+  statusEl.style.color = "var(--accent)";
+  startBtn.disabled = true;
+  startBtn.style.opacity = "0.6";
+  startBtn.style.cursor = "not-allowed";
 } else {
-  document.getElementById("status").innerText = "Available";
+  statusEl.innerText = "Available";
+  statusEl.style.color = "var(--primary)";
 }
 
-document.getElementById("startBtn").onclick = () => {
+/* Button actions */
+startBtn.onclick = () => {
+  if (startBtn.disabled) return;
   window.location.href = "/exam.html";
 };
 
-document.getElementById("resultBtn").onclick = () => {
+resultBtn.onclick = () => {
   window.location.href = "/student-result.html";
 };

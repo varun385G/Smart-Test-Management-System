@@ -6,7 +6,12 @@ async function loadAdminResults() {
     return;
   }
 
-  container.innerHTML = "<p>Loading results...</p>";
+  /* Loading state */
+  container.innerHTML = `
+    <div class="card" style="text-align:center; color:var(--muted);">
+      Loading results...
+    </div>
+  `;
 
   try {
     const res = await fetch("/api/admin/results/grouped");
@@ -17,49 +22,79 @@ async function loadAdminResults() {
     container.innerHTML = "";
 
     if (Object.keys(data).length === 0) {
-      container.innerHTML = "<p>No staff or results found</p>";
+      container.innerHTML = `
+        <div class="card" style="text-align:center; color:var(--muted);">
+          No staff or results found
+        </div>
+      `;
       return;
     }
 
     Object.values(data).forEach(staff => {
       const staffCard = document.createElement("div");
-      staffCard.className = "card staff-card";
+      staffCard.className = "card";
+      staffCard.style.marginBottom = "24px";
 
-      staffCard.innerHTML = `<h3>👤 ${staff.staffName}</h3>`;
+      const staffTitle = document.createElement("h3");
+      staffTitle.innerText = staff.staffName;
+      staffTitle.style.marginTop = "0";
+
+      staffCard.appendChild(staffTitle);
 
       const tests = staff.tests || {};
+
       if (Object.keys(tests).length === 0) {
-        staffCard.innerHTML += "<p class='muted'>No tests</p>";
+        const noTest = document.createElement("p");
+        noTest.innerText = "No tests";
+        noTest.style.color = "var(--muted)";
+        staffCard.appendChild(noTest);
       }
 
       Object.entries(tests).forEach(([testId, test]) => {
         const testDiv = document.createElement("div");
-        testDiv.className = "test-block";
+        testDiv.style.marginTop = "16px";
 
-        testDiv.innerHTML = `
-          <h4>📘 ${test.testTitle} <span class="muted">(${testId})</span></h4>
+        const testTitle = document.createElement("h4");
+        testTitle.innerHTML = `
+          ${test.testTitle}
+          <span style="color:var(--muted); font-size:13px;">
+            (${testId})
+          </span>
         `;
+        testTitle.style.marginBottom = "8px";
+
+        testDiv.appendChild(testTitle);
 
         if (!test.results.length) {
-          testDiv.innerHTML += `<p class="muted">No attempts</p>`;
+          const noAttempt = document.createElement("p");
+          noAttempt.innerText = "No attempts";
+          noAttempt.style.color = "var(--muted)";
+          testDiv.appendChild(noAttempt);
         } else {
           const table = document.createElement("table");
+          table.className = "table";
+
           table.innerHTML = `
-            <tr>
-              <th>Student</th>
-              <th>Register No</th>
-              <th>Score</th>
-            </tr>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Register No</th>
+                <th>Score</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
           `;
 
+          const tbody = table.querySelector("tbody");
+
           test.results.forEach(r => {
-            table.innerHTML += `
-              <tr>
-                <td>${r.studentName}</td>
-                <td>${r.studentReg}</td>
-                <td>${r.score}/${r.total}</td>
-              </tr>
+            const row = document.createElement("tr");
+            row.innerHTML = `
+              <td>${r.studentName}</td>
+              <td>${r.studentReg}</td>
+              <td>${r.score}/${r.total}</td>
             `;
+            tbody.appendChild(row);
           });
 
           testDiv.appendChild(table);
@@ -73,7 +108,11 @@ async function loadAdminResults() {
 
   } catch (err) {
     console.error(err);
-    container.innerHTML = "<p>Error loading admin results</p>";
+    container.innerHTML = `
+      <div class="card" style="text-align:center; color:#dc2626;">
+        Error loading admin results
+      </div>
+    `;
   }
 }
 

@@ -5,47 +5,82 @@
   <title>Student Login</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!-- Font -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="responsive.css">
   <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="modern-theme.css">
 </head>
 
-<body>
+<body class="modern-ui">
 
-<header class="header">
-  <h2>Enter Test</h2>
-</header>
+  <!-- PAGE CONTAINER -->
+  <main class="container" style="padding:24px; max-width:420px; margin:auto;">
 
-<main class="container">
+    <!-- HEADER -->
+    <section class="card" style="margin-bottom:20px;">
+      <h2 style="margin:0;">Enter Test</h2>
+      <p style="color:var(--muted); margin-top:6px;">
+        Enter your test details to start the exam
+      </p>
+    </section>
 
-  <!-- STUDENT FORM -->
-  <form id="studentForm" class="card">
+    <!-- STUDENT FORM -->
+    <form id="studentForm" class="card">
 
-    <input id="testId" placeholder="Test ID" required>
-    <br><br>
+      <input
+        id="testId"
+        placeholder="Test ID"
+        required
+        style="width:100%; margin-bottom:12px;"
+      >
 
-    <input id="password" placeholder="Test Password" required>
-    <br><br>
+      <input
+        id="password"
+        type="password"
+        placeholder="Test Password"
+        required
+        style="width:100%; margin-bottom:12px;"
+      >
 
-    <input id="name" placeholder="Your Name" required>
-    <br><br>
+      <input
+        id="name"
+        placeholder="Your Name"
+        required
+        style="width:100%; margin-bottom:12px;"
+      >
 
-    <input id="reg" placeholder="Register Number" required>
-    <br><br>
+      <input
+        id="reg"
+        placeholder="Register Number"
+        required
+        style="width:100%; margin-bottom:12px;"
+      >
 
-    <button type="submit">Enter Exam</button>
+      <button
+        type="submit"
+        class="btn btn-primary"
+        style="width:100%;"
+      >
+        Enter Exam
+      </button>
 
-  </form>
+    </form>
 
-  <br>
+    <!-- MESSAGE AREA -->
+    <div
+      id="messageBox"
+      style="margin-top:16px; text-align:center;"
+    ></div>
 
-  <!-- MESSAGE AREA (IMPORTANT) -->
-  <div id="messageBox"></div>
+  </main>
 
-</main>
+  <!-- SCRIPT -->
+  <script src="student.js"></script>
 
-<script src="student.js"></script>
 </body>
 </html>

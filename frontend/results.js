@@ -2,26 +2,26 @@ async function loadResults() {
   const testId = new URLSearchParams(window.location.search).get("testId");
   const tbody = document.getElementById("results");
 
-  // 🛑 Safety check
   if (!tbody) {
-    console.error("❌ <tbody id='results'> not found in HTML");
+    console.error("results tbody not found");
     return;
   }
 
   tbody.innerHTML = `
     <tr>
-      <td colspan="4" style="text-align:center;">Loading...</td>
+      <td colspan="3" style="text-align:center; color:var(--muted);">
+        Loading results...
+      </td>
     </tr>
   `;
 
   try {
     const res = await fetch(`/api/results/${testId}`);
 
-    // 🔒 Results not published
     if (res.status === 403) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="4" style="text-align:center;">
+          <td colspan="3" style="text-align:center; color:var(--muted);">
             Results not published yet
           </td>
         </tr>
@@ -29,18 +29,14 @@ async function loadResults() {
       return;
     }
 
-    // ❌ Any other error
-    if (!res.ok) {
-      throw new Error("Failed to load results");
-    }
+    if (!res.ok) throw new Error();
 
     const data = await res.json();
 
-    // 🟡 No attempts
     if (!data.length) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="4" style="text-align:center;">
+          <td colspan="3" style="text-align:center; color:var(--muted);">
             No attempts yet
           </td>
         </tr>
@@ -48,25 +44,25 @@ async function loadResults() {
       return;
     }
 
-    // ✅ Render results
     tbody.innerHTML = "";
 
     data.forEach(r => {
-      tbody.innerHTML += `
-        <tr>
-          <td>${r.studentName}</td>
-          <td>${r.studentReg}</td>
-          <td>${r.score} / ${r.total}</td>
-          <td>${new Date(r.submittedAt).toLocaleString()}</td>
-        </tr>
+      const row = document.createElement("tr");
+
+      row.innerHTML = `
+        <td>${r.studentName}</td>
+        <td>${r.studentReg}</td>
+        <td>${r.score} / ${r.total}</td>
       `;
+
+      tbody.appendChild(row);
     });
 
   } catch (err) {
     console.error("RESULT LOAD ERROR:", err);
     tbody.innerHTML = `
       <tr>
-        <td colspan="4" style="text-align:center;">
+        <td colspan="3" style="text-align:center; color:#dc2626;">
           Error loading results
         </td>
       </tr>
@@ -74,7 +70,6 @@ async function loadResults() {
   }
 }
 
-// ⬅ Dashboard button
 function goDashboard() {
   window.location.href = "/dashboard.html";
 }

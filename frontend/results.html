@@ -5,24 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Test Results</title>
 
+  <!-- Styles -->
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="responsive.css">
   <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="modern-theme.css">
 </head>
 
-<body>
+<body class="modern-ui">
 
-  <header class="header">
-    <h2>Test Results</h2>
-    <button class="secondary" onclick="goDashboard()">← Dashboard</button>
+  <!-- PAGE CONTAINER -->
+  <main class="container" style="padding:24px; max-width:900px; margin:auto;">
 
-  </header>
+    <!-- HEADER -->
+    <section class="card" style="margin-bottom:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="margin:0;">Test Results</h2>
+        <button class="btn" onclick="goDashboard()">Back to Dashboard</button>
+      </div>
+    </section>
 
-  <main class="container">
-
-    <div class="card">
-      <table>
+    <!-- RESULTS TABLE -->
+    <section class="card">
+      <table class="table">
         <thead>
           <tr>
             <th>Student</th>
@@ -32,10 +38,12 @@
         </thead>
         <tbody id="results"></tbody>
       </table>
-    </div>
+    </section>
 
   </main>
 
+  <!-- SCRIPT -->
   <script src="results.js"></script>
+
 </body>
 </html>

@@ -3,103 +3,115 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <title>Create Test</title>
 
-  <!-- FONTS -->
+  <!-- Font -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
-  <!-- GLOBAL STYLES -->
+  <!-- Styles -->
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="responsive.css">
   <link rel="stylesheet" href="app.css">
   <link rel="stylesheet" href="create-test.css">
+  <link rel="stylesheet" href="modern-theme.css">
 </head>
 
-<body>
+<body class="modern-ui">
 
-  <!-- ===== HEADER ===== -->
-  <header class="header">
-    <h2>Create New Test</h2>
-    <button class="secondary" onclick="goBack()">⬅ Dashboard</button>
+  <!-- HEADER -->
+  <header class="card" style="margin:16px;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">Create New Test</h2>
+      <button class="btn" onclick="goBack()">Back to Dashboard</button>
+    </div>
   </header>
-<!-- SUCCESS MESSAGE -->
-<div id="successBox" class="card center" style="display:none">
-  <h3>Test Created Successfully</h3>
-  <p class="muted">Share this Test ID with students</p>
 
-  <h2 id="createdTestId" style="margin:12px 0"></h2>
+  <!-- SUCCESS BOX -->
+  <div id="successBox" class="card center" style="display:none; max-width:500px; margin:24px auto;">
+    <h3>Test Created Successfully</h3>
+    <p style="color:var(--muted);">Share this Test ID with students</p>
 
-  <button onclick="copyTestId()">Copy Test ID</button>
-  <br><br>
-  <button class="secondary" onclick="goBack()">Go to Dashboard</button>
-</div>
+    <h2 id="createdTestId" style="margin:12px 0;"></h2>
 
-  <!-- ===== MAIN ===== -->
-  <main class="container">
+    <button class="btn btn-primary" onclick="copyTestId()">Copy Test ID</button>
+    <br><br>
+    <button class="btn" onclick="goBack()">Go to Dashboard</button>
+  </div>
+
+  <!-- MAIN -->
+  <main class="container" style="padding:16px; max-width:1100px; margin:auto;">
 
     <!-- TEST DETAILS -->
-    <div class="card">
+    <section class="card" style="margin-bottom:20px;">
       <h3>Test Details</h3>
-      <input id="title" placeholder="Test Title">
-      <input id="password" placeholder="Test Password">
-      <input id="duration" type="number" placeholder="Duration (minutes)">
-    </div>
+
+      <input id="title" placeholder="Test Title" style="width:100%; margin-bottom:10px;">
+      <input id="password" placeholder="Test Password" style="width:100%; margin-bottom:10px;">
+      <input id="duration" type="number" placeholder="Duration in minutes" style="width:100%;">
+    </section>
 
     <!-- SETTINGS -->
-    <div class="card">
+    <section class="card" style="margin-bottom:20px;">
       <h3>Exam Settings</h3>
 
       <label>
         <input type="checkbox" id="shuffleQ" checked>
         Shuffle Questions
-      </label><br><br>
+      </label>
+      <br><br>
 
       <label>
         <input type="checkbox" id="shuffleA" checked>
         Shuffle Answers
       </label>
-    </div>
+    </section>
 
     <!-- SECURITY -->
-    <div class="card">
+    <section class="card" style="margin-bottom:20px;">
       <h3>Security Rules</h3>
 
       <label>
         <input type="checkbox" id="fullscreen" checked>
         Enforce Fullscreen
-      </label><br><br>
+      </label>
+      <br><br>
 
       <label>
         <input type="checkbox" id="disableCopy" checked>
-        Disable Copy / Paste
-      </label><br><br>
+        Disable Copy and Paste
+      </label>
+      <br><br>
 
       <label>
         <input type="checkbox" id="autoSubmitTab">
-        Auto Submit on Tab Switch
+        Auto submit on tab switch
       </label>
-    </div>
+    </section>
 
     <!-- QUESTIONS -->
-    <h3>Questions</h3>
-<div id="questions"></div>
+    <section class="card" style="margin-bottom:20px;">
+      <h3>Questions</h3>
 
-<button onclick="addQuestion()">➕ Add Question</button>
+      <div id="questions"></div>
 
-<p class="muted" style="margin-top:10px">
-  Supported types: MCQ, MSQ, NAT (Numeric Answer)
-</p>
+      <button class="btn btn-primary" style="margin-top:12px;" onclick="addQuestion()">
+        Add Question
+      </button>
 
-    </div>
+      <p style="color:var(--muted); margin-top:10px;">
+        Supported types. MCQ, MSQ, NAT
+      </p>
+    </section>
 
     <!-- ACTION -->
-    <div class="card center">
-      <button onclick="saveTest()">💾 Save Test</button>
-    </div>
+    <section class="card center">
+      <button class="btn btn-primary" onclick="saveTest()">
+        Save Test
+      </button>
+    </section>
 
-    <!-- ✅ RESULT BOX -->
+    <!-- RESULT -->
     <div id="resultBox"></div>
 
   </main>

@@ -9,44 +9,72 @@ form.addEventListener("submit", async e => {
   const reg = document.getElementById("reg").value.trim();
   const name = document.getElementById("name").value.trim();
 
-  msgBox.innerHTML = "Validating…";
+  msgBox.innerHTML = `<p style="color:var(--muted);">Validating...</p>`;
 
-  const res = await fetch("/api/student/validate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ testId, password, reg })
-  });
+  const submitBtn = form.querySelector("button[type='submit']");
+  submitBtn.disabled = true;
+  submitBtn.style.opacity = "0.6";
 
-  const data = await res.json();
+  try {
+    const res = await fetch("/api/student/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ testId, password, reg })
+    });
 
-  if (!res.ok) {
-    msgBox.innerHTML = `<p class="danger">${data.message}</p>`;
-    return;
-  }
+    const data = await res.json();
 
-  // 🚫 Already attempted
-  if (data.attempted) {
+    if (!res.ok) {
+      msgBox.innerHTML = `
+        <p style="color:#dc2626;">
+          ${data.message || "Validation failed"}
+        </p>
+      `;
+      return;
+    }
+
+    // Already attempted
+    if (data.attempted) {
+      msgBox.innerHTML = `
+        <div class="card center">
+          <h3>Exam already attempted</h3>
+          ${
+            data.resultsPublished
+              ? `<button class="btn"
+                          onclick="viewResult('${testId}','${reg}')">
+                    View Result
+                 </button>`
+              : `<p style="color:var(--muted);">
+                    Results not published yet
+                 </p>`
+          }
+          <br><br>
+          <button class="btn" onclick="goHome()">
+            Back to Home
+          </button>
+        </div>
+      `;
+      return;
+    }
+
+    // Fresh attempt
+    localStorage.setItem("testId", testId);
+    localStorage.setItem("studentName", name);
+    localStorage.setItem("studentReg", reg);
+
+    location.href = "/exam.html";
+
+  } catch (err) {
+    console.error(err);
     msgBox.innerHTML = `
-      <div class="card center">
-        <h3>Exam already attempted</h3>
-        ${
-          data.resultsPublished
-            ? `<button onclick="viewResult('${testId}','${reg}')">View Result</button>`
-            : `<p class="muted">Results not published yet</p>`
-        }
-        <br><br>
-        <button class="secondary" onclick="goHome()">Back to Home</button>
-      </div>
+      <p style="color:#dc2626;">
+        Server error. Try again.
+      </p>
     `;
-    return;
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.style.opacity = "1";
   }
-
-  // ✅ Fresh attempt
-  localStorage.setItem("testId", testId);
-  localStorage.setItem("studentName", name);
-  localStorage.setItem("studentReg", reg);
-
-  location.href = "/exam.html";
 });
 
 function viewResult(testId, reg) {

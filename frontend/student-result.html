@@ -5,27 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Exam Result</title>
 
-  <!-- Global UI -->
+  <!-- Styles -->
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="responsive.css">
   <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="modern-theme.css">
 </head>
 
-<body>
+<body class="modern-ui">
 
-  <!-- HEADER -->
-  <header class="header">
-    <h2>Exam Result</h2>
-  </header>
+  <!-- PAGE CONTAINER -->
+  <main class="container" style="padding:24px; max-width:800px; margin:auto;">
 
-  <!-- RESULT CONTAINER (🔥 MUST MATCH JS) -->
-  <main class="container">
-    <div id="resultContainer">
-      <div class="card center muted">Loading result…</div>
-    </div>
+    <!-- HEADER -->
+    <section class="card" style="margin-bottom:20px;">
+      <h2 style="margin:0;">Exam Result</h2>
+    </section>
+
+    <!-- RESULT CONTAINER -->
+    <section class="card">
+      <div id="resultContainer">
+        <div class="center" style="color:var(--muted);">
+          Loading result...
+        </div>
+      </div>
+    </section>
+
   </main>
 
+  <!-- SCRIPT -->
   <script src="student-result.js"></script>
+
 </body>
 </html>

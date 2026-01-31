@@ -1,95 +1,98 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Smart Test Management System</title>
 
+  <!-- Font -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
   <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="responsive.css">
-<link rel="stylesheet" href="app.css">
-
-  <style>
-    .hero {
-      text-align: center;
-      padding: 80px 20px;
-      background: linear-gradient(135deg, #1f2937, #111827);
-      color: white;
-    }
-
-    .hero h1 {
-      font-size: 36px;
-      margin-bottom: 10px;
-    }
-
-    .hero p {
-      font-size: 18px;
-      opacity: 0.85;
-    }
-
-    .hero .buttons {
-      margin-top: 30px;
-    }
-
-    .hero button {
-      margin: 8px;
-      font-size: 16px;
-      padding: 12px 24px;
-    }
-
-    .features {
-      padding: 40px 20px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
-    }
-
-    .feature {
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    }
-  </style>
+  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="modern-theme.css">
 </head>
 
-<body>
+<body class="modern-ui">
 
-<div class="hero">
-  <h1>Smart Test Management System</h1>
-  <p>Secure • Scalable • Smart Online Examination Platform</p>
+  <!-- HERO -->
+  <section
+    style="
+      padding:80px 20px;
+      text-align:center;
+      background:linear-gradient(135deg,#1f2937,#111827);
+      color:white;
+    "
+  >
+    <h1 style="font-size:36px; margin-bottom:12px;">
+      Smart Test Management System
+    </h1>
 
-  <div class="buttons">
-    <!-- ✅ FIXED LINKS -->
-    <button onclick="location.href='/staff.html'">Staff Login</button>
-    <button class="secondary" onclick="location.href='/student.html'">Student Access</button>
-  </div>
-</div>
+    <p style="font-size:18px; opacity:0.85;">
+      Secure. Scalable. Smart online examination platform.
+    </p>
 
-<div class="features">
-  <div class="feature">
-    <h3>Secure Exams</h3>
-    <p>Fullscreen enforcement, copy-paste prevention, auto-submit on tab switch.</p>
-  </div>
+    <div style="margin-top:32px;">
+      <button
+        class="btn btn-primary"
+        onclick="location.href='/staff.html'"
+      >
+        Staff Login
+      </button>
 
-  <div class="feature">
-    <h3>Role-Based Access</h3>
-    <p>Admin, Staff and Student dashboards with controlled permissions.</p>
-  </div>
+      <button
+        class="btn"
+        style="margin-left:12px;"
+        onclick="location.href='/student.html'"
+      >
+        Student Access
+      </button>
+    </div>
+  </section>
 
-  <div class="feature">
-    <h3>Real-Time Analytics</h3>
-    <p>Instant result processing and performance tracking.</p>
-  </div>
+  <!-- FEATURES -->
+  <section
+    class="container"
+    style="
+      padding:40px 20px;
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+      gap:20px;
+      max-width:1200px;
+      margin:auto;
+    "
+  >
+    <div class="card">
+      <h3>Secure Exams</h3>
+      <p style="color:var(--muted);">
+        Fullscreen enforcement, copy and paste blocking, auto submit on tab switch.
+      </p>
+    </div>
 
-  <div class="feature">
-    <h3>Scalable System</h3>
-    <p>Supports multiple staff, tests, and concurrent students.</p>
-  </div>
-</div>
+    <div class="card">
+      <h3>Role Based Access</h3>
+      <p style="color:var(--muted);">
+        Admin, staff, and student dashboards with controlled permissions.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>Real Time Analytics</h3>
+      <p style="color:var(--muted);">
+        Instant result processing and performance tracking.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>Scalable System</h3>
+      <p style="color:var(--muted);">
+        Supports multiple staff, tests, and concurrent students.
+      </p>
+    </div>
+  </section>
 
 </body>
 </html>

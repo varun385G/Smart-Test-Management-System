@@ -1,24 +1,31 @@
-body { font-family: Arial; background: #f4f6f8; }
+/* ================= BASE RESET ================= */
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ================= HEADER ================= */
 
 .header {
-  background: #1e88e5;
-  color: white;
-  padding: 15px;
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
+
+/* ================= TABLE FALLBACK ================= */
+/* Real styling handled by .table in ui.css */
 
 table {
   width: 100%;
-  background: white;
   border-collapse: collapse;
 }
 
-th, td {
-  padding: 10px;
-  border: 1px solid #ddd;
-}
+/* ================= BUTTON FALLBACK ================= */
+/* Real styling handled by .btn in ui.css */
 
 button {
-  margin-right: 5px;
+  cursor: pointer;
 }

@@ -1,7 +1,13 @@
 const staffId = localStorage.getItem("staffId");
 
 if (!staffId) {
-  document.body.innerHTML = "<h2 class='center'>Access denied</h2>";
+  document.body.innerHTML = `
+    <div class="container center" style="padding:40px;">
+      <div class="card">
+        <h2>Access denied</h2>
+      </div>
+    </div>
+  `;
   throw new Error("No staff login");
 }
 
@@ -10,44 +16,57 @@ function goBack() {
 }
 
 async function loadTests() {
-  const res = await fetch(`/api/tests/by-staff/${staffId}`);
-  const tests = await res.json();
+  try {
+    const res = await fetch(`/api/tests/by-staff/${staffId}`);
+    if (!res.ok) throw new Error();
 
-  const table = document.getElementById("testTable");
-  table.innerHTML = "";
+    const tests = await res.json();
+    const table = document.getElementById("testTable");
+    table.innerHTML = "";
 
-  tests.forEach(t => {
-    const tr = document.createElement("tr");
+    tests.forEach(t => {
+      const tr = document.createElement("tr");
 
-    let postBtn = "";
+      let postBtnHtml = "";
 
-    if (t.resultsPublished) {
-      postBtn = `
-        <button class="danger" disabled style="opacity:0.6">
-          Results Published
-        </button>
+      if (t.resultsPublished) {
+        postBtnHtml = `
+          <button class="btn" disabled style="opacity:0.6;">
+            Results Published
+          </button>
+        `;
+      } else {
+        postBtnHtml = `
+          <button class="btn btn-primary"
+                  onclick="publishResults('${t.testId}', this)">
+            Post Results
+          </button>
+        `;
+      }
+
+      tr.innerHTML = `
+        <td>${t.testId}</td>
+        <td>${t.title}</td>
+        <td>${t.attempts}</td>
+        <td>
+          <button class="btn"
+                  onclick="viewResults('${t.testId}')">
+            View
+          </button>
+          ${postBtnHtml}
+          <button class="btn"
+                  onclick="deleteTest('${t._id}')">
+            Delete
+          </button>
+        </td>
       `;
-    } else {
-      postBtn = `
-        <button onclick="publishResults('${t.testId}', this)">
-          Post Results
-        </button>
-      `;
-    }
 
-    tr.innerHTML = `
-      <td>${t.testId}</td>
-      <td>${t.title}</td>
-      <td>${t.attempts}</td>
-      <td>
-        <button onclick="viewResults('${t.testId}')">View</button>
-        ${postBtn}
-        <button class="danger" onclick="deleteTest('${t._id}')">Delete</button>
-      </td>
-    `;
+      table.appendChild(tr);
+    });
 
-    table.appendChild(tr);
-  });
+  } catch {
+    alert("Failed to load tests");
+  }
 }
 
 function viewResults(testId) {
@@ -55,29 +74,38 @@ function viewResults(testId) {
 }
 
 async function publishResults(testId, btn) {
-  if (!confirm("Once published, students can view results.\nContinue?")) return;
+  if (!confirm("Once published, students can view results. Continue?")) return;
 
-  const res = await fetch(`/api/tests/${testId}/publish-results`, {
-    method: "POST"
-  });
-
-  if (!res.ok) {
-    alert("Failed to publish results");
-    return;
-  }
-
-  // UI feedback
-  btn.innerText = "Results Published";
-  btn.className = "danger";
   btn.disabled = true;
   btn.style.opacity = "0.6";
+  btn.innerText = "Publishing...";
+
+  try {
+    const res = await fetch(`/api/tests/${testId}/publish-results`, {
+      method: "POST"
+    });
+
+    if (!res.ok) throw new Error();
+
+    btn.innerText = "Results Published";
+
+  } catch {
+    alert("Failed to publish results");
+    btn.disabled = false;
+    btn.style.opacity = "1";
+    btn.innerText = "Post Results";
+  }
 }
 
 async function deleteTest(id) {
   if (!confirm("Delete this test permanently?")) return;
 
-  await fetch(`/api/tests/${id}`, { method: "DELETE" });
-  loadTests();
+  try {
+    await fetch(`/api/tests/${id}`, { method: "DELETE" });
+    loadTests();
+  } catch {
+    alert("Failed to delete test");
+  }
 }
 
 loadTests();
