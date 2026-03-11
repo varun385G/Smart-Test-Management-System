@@ -2,117 +2,140 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, user-scalable=no"
-  >
-
-  <title>Online Examination</title>
-
-  <!-- Styles -->
-  <link rel="stylesheet" href="theme.css">
-  <link rel="stylesheet" href="ui.css">
-  <link rel="stylesheet" href="responsive.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Online Examination — STMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
+  <style>
+    body { padding-bottom: 80px; }
+
+    /* Exam layout */
+    .exam-layout { display: grid; grid-template-columns: 1fr 220px; gap: 20px; max-width: 1100px; margin: auto; padding: 20px; }
+    @media (max-width: 768px) { .exam-layout { grid-template-columns: 1fr; } #navigatorPanel { order: -1; } }
+
+    /* Timer */
+    #timerDisplay { font-size: 20px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+    #timerDisplay.warn { color: var(--warning); }
+    #timerDisplay.danger { color: var(--danger); animation: pulse 1s infinite; }
+    @keyframes pulse { 50% { opacity: 0.5; } }
+
+    /* Progress */
+    #progressBar { height: 4px; background: var(--primary); transition: width 0.4s ease; }
+
+    /* Question navigator */
+    .nav-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+    .nav-btn {
+      width: 100%; aspect-ratio: 1; border-radius: 7px; border: 1.5px solid var(--border);
+      background: var(--card); font-size: 12px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; color: var(--text-2); position: relative;
+      font-family: var(--font-main);
+    }
+    .nav-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .nav-btn.answered { background: var(--primary); border-color: var(--primary); color: white; }
+    .nav-btn.current  { ring: 2px solid var(--primary); box-shadow: 0 0 0 2px var(--primary); }
+    .nav-btn.flagged::after {
+      content: '🚩';
+      position: absolute; top: -4px; right: -4px;
+      font-size: 9px; line-height: 1;
+    }
+
+    /* Exam question card */
+    .q-exam-card { background: var(--card); border-radius: var(--radius); border: 1.5px solid var(--border); padding: 24px; margin-bottom: 16px; }
+    .q-exam-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; gap: 12px; }
+    .q-exam-num { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .q-exam-text { font-size: 16px; font-weight: 600; line-height: 1.5; color: var(--text); }
+
+    .exam-option {
+      display: flex; align-items: center; gap: 12px;
+      padding: 13px 16px; border: 1.5px solid var(--border);
+      border-radius: 10px; margin-bottom: 8px;
+      cursor: pointer; transition: all 0.15s;
+      font-size: 14.5px; color: var(--text-2);
+    }
+    .exam-option:hover { border-color: var(--primary); background: var(--primary-light); color: var(--primary-dark); }
+    .exam-option.selected { border-color: var(--primary); background: var(--primary-light); color: var(--primary-dark); }
+    .exam-option input { width: 16px; height: 16px; margin: 0; flex-shrink: 0; accent-color: var(--primary); }
+
+    /* Flag button */
+    .flag-btn {
+      padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border);
+      background: transparent; cursor: pointer; font-size: 13px; color: var(--muted);
+      transition: all 0.15s; display: flex; align-items: center; gap: 4px;
+    }
+    .flag-btn.flagged { background: #fff7ed; border-color: var(--warning); color: var(--warning); }
+  </style>
 </head>
+<body>
+  <!-- Top progress bar -->
+  <div style="height:4px; background:var(--border); position:sticky; top:0; z-index:200;">
+    <div id="progressBar" style="height:4px; background:var(--primary); width:0%; transition:width 0.4s;"></div>
+  </div>
 
-<body class="modern-ui">
-
-  <!-- HEADER -->
-  <header class="card" style="margin:16px;">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <h2 style="margin:0;">Online Examination</h2>
-      <div id="timer" style="font-weight:600;">
-        Time. --:--
+  <!-- Header -->
+  <header class="header" style="position:sticky; top:4px; z-index:100;">
+    <div style="display:flex; align-items:center; gap:16px;">
+      <div>
+        <div style="font-weight:700; font-size:15px;" id="examTitle">Loading exam…</div>
+        <div style="font-size:12px; color:var(--muted);">
+          <span id="answeredCount">0</span> answered · <span id="flaggedCount">0</span> flagged
+        </div>
       </div>
     </div>
+    <div id="timerDisplay">--:--</div>
   </header>
 
-  <!-- EXAM CONTAINER -->
-  <main
-    class="container"
-    id="examContainer"
-    style="padding:16px; max-width:1000px; margin:auto;"
-  >
-    <div class="card center" style="color:var(--muted);">
-      Loading exam...
+  <div class="exam-layout">
+    <!-- Question area -->
+    <div id="examContainer">
+      <div class="q-exam-card" style="text-align:center; color:var(--muted);">Loading exam…</div>
     </div>
-  </main>
 
-  <!-- SUBMIT BAR -->
-  <div
-    class="card"
-    style="
-      position:fixed;
-      bottom:0;
-      left:0;
-      right:0;
-      padding:12px;
-      display:flex;
-      justify-content:center;
-      background:var(--card);
-      box-shadow:0 -6px 20px rgba(0,0,0,0.08);
-    "
-  >
-    <button class="btn btn-primary" onclick="confirmSubmit()">
-      Submit Exam
-    </button>
+    <!-- Navigator panel -->
+    <aside id="navigatorPanel">
+      <div class="section-card" style="position:sticky; top:80px; padding:16px;">
+        <div style="font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Question Map</div>
+        <div class="nav-grid" id="navGrid"></div>
+        <div class="divider" style="margin:12px 0;"></div>
+        <div style="font-size:11.5px; color:var(--muted); display:flex; flex-direction:column; gap:5px;">
+          <div style="display:flex; align-items:center; gap:6px;"><div style="width:14px;height:14px;border-radius:4px;background:var(--primary);"></div> Answered</div>
+          <div style="display:flex; align-items:center; gap:6px;"><div style="width:14px;height:14px;border-radius:4px;border:1.5px solid var(--border);"></div> Not answered</div>
+          <div style="display:flex; align-items:center; gap:6px; position:relative;">
+            <div style="width:14px;height:14px;border-radius:4px;border:1.5px solid var(--border); position:relative;">
+              <span style="position:absolute; top:-6px; right:-6px; font-size:9px;">🚩</span>
+            </div> Flagged
+          </div>
+        </div>
+        <button class="btn btn-primary" style="width:100%; margin-top:14px;" onclick="confirmSubmit()">Submit Exam</button>
+      </div>
+    </aside>
   </div>
 
-  <!-- CONFIRM BOX -->
-  <div
-    id="confirmBox"
-    style="
-      display:none;
-      position:fixed;
-      inset:0;
-      background:rgba(0,0,0,0.6);
-      align-items:center;
-      justify-content:center;
-      z-index:9999;
-    "
-  >
-    <div class="card center" style="max-width:380px;">
-      <h3>Confirm Submission</h3>
-      <p style="color:var(--muted);">
-        Are you sure. You cannot re attempt this exam.
-      </p>
-      <br>
-      <button class="btn btn-primary" onclick="finalSubmit()">
-        Yes. Submit
-      </button>
-      <br><br>
-      <button class="btn" onclick="cancelSubmit()">
-        Cancel
-      </button>
+  <!-- Submit confirmation -->
+  <div class="modal-overlay" id="confirmBox">
+    <div class="modal-box" style="max-width:400px; text-align:center;">
+      <div style="font-size:40px; margin-bottom:12px;">📤</div>
+      <h3 style="margin-bottom:8px;">Submit Exam?</h3>
+      <p style="color:var(--muted); font-size:14px; margin-bottom:8px;">You have answered <strong id="confirmAnswered">0</strong> out of <strong id="confirmTotal">0</strong> questions.</p>
+      <p style="color:var(--danger); font-size:13px; margin-bottom:20px;">⚠ This action cannot be undone.</p>
+      <div style="display:flex; gap:10px; justify-content:center;">
+        <button class="btn" onclick="cancelSubmit()">Go Back</button>
+        <button class="btn btn-primary" onclick="finalSubmit()">Yes, Submit</button>
+      </div>
     </div>
   </div>
 
-  <!-- WARNING BOX -->
-  <div
-    id="warningBox"
-    style="
-      display:none;
-      position:fixed;
-      inset:0;
-      background:rgba(0,0,0,0.6);
-      align-items:center;
-      justify-content:center;
-      z-index:9999;
-    "
-  >
-    <div class="card center" style="max-width:360px;">
-      <h3>Security Warning</h3>
-      <p class="muted"></p>
-      <br>
-      <button class="btn btn-primary" onclick="closeWarning()">
-        Close
-      </button>
+  <!-- Security warning -->
+  <div class="modal-overlay" id="warningBox">
+    <div class="modal-box" style="max-width:380px; text-align:center;">
+      <div style="font-size:40px; margin-bottom:12px;">⚠️</div>
+      <h3 style="color:var(--warning); margin-bottom:8px;">Security Warning</h3>
+      <p class="muted" id="warningText" style="margin-bottom:20px;"></p>
+      <button class="btn btn-primary" onclick="closeWarning()">I Understand</button>
     </div>
   </div>
 
-  <!-- SCRIPT -->
+  <script src="ui.js"></script>
   <script src="exam.js" defer></script>
-
 </body>
 </html>

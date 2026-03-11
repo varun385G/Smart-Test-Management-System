@@ -3,120 +3,163 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Create Test</title>
-
-  <!-- Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-
-  <!-- Styles -->
-  <link rel="stylesheet" href="theme.css">
-  <link rel="stylesheet" href="ui.css">
-  <link rel="stylesheet" href="responsive.css">
+  <title>Create Test — STMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
   <link rel="stylesheet" href="create-test.css">
 </head>
-
-<body class="modern-ui">
+<body>
 
   <!-- HEADER -->
-  <header class="card" style="margin:16px;">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <h2 style="margin:0;">Create New Test</h2>
-      <button class="btn" onclick="goBack()">Back to Dashboard</button>
+  <header class="header">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <button class="btn btn-ghost btn-sm" onclick="goBack()">← Back</button>
+      <div>
+        <div id="pageTitle" style="font-weight:700; font-size:15px;">Create New Test</div>
+        <div id="questionCounter" style="font-size:12px; color:var(--muted);">0 questions · 0 marks</div>
+      </div>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <button class="btn btn-sm" onclick="previewTest()" id="previewBtn" disabled>👁 Preview</button>
+      <button class="btn btn-primary" onclick="saveTest()" id="saveBtn">💾 Save Test</button>
     </div>
   </header>
 
   <!-- SUCCESS BOX -->
-  <div id="successBox" class="card center" style="display:none; max-width:500px; margin:24px auto;">
-    <h3>Test Created Successfully</h3>
-    <p style="color:var(--muted);">Share this Test ID with students</p>
-
-    <h2 id="createdTestId" style="margin:12px 0;"></h2>
-
-    <button class="btn btn-primary" onclick="copyTestId()">Copy Test ID</button>
-    <br><br>
-    <button class="btn" onclick="goBack()">Go to Dashboard</button>
+  <div id="successBox" style="display:none; max-width:480px; margin:60px auto; padding:20px;">
+    <div class="card" style="text-align:center; padding:40px;">
+      <div style="font-size:48px; margin-bottom:16px;">🎉</div>
+      <h2 style="margin-bottom:8px;">Test Created!</h2>
+      <p style="color:var(--muted); margin-bottom:20px;">Share this Test ID with your students</p>
+      <div style="background:var(--primary-light); border-radius:12px; padding:16px 24px; margin-bottom:20px;">
+        <div id="createdTestId" style="font-size:28px; font-weight:800; color:var(--primary); letter-spacing:2px;"></div>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="copyTestId()">📋 Copy Test ID</button>
+        <button class="btn" onclick="goBack()">Go to Dashboard</button>
+      </div>
+    </div>
   </div>
 
-  <!-- MAIN -->
-  <main class="container" style="padding:16px; max-width:1100px; margin:auto;">
+  <!-- MAIN CONTENT -->
+  <main id="mainContent" style="max-width:900px; margin:auto; padding:24px 20px;">
 
     <!-- TEST DETAILS -->
-    <section class="card" style="margin-bottom:20px;">
-      <h3>Test Details</h3>
-
-      <input id="title" placeholder="Test Title" style="width:100%; margin-bottom:10px;">
-      <input id="password" placeholder="Test Password" style="width:100%; margin-bottom:10px;">
-      <input id="duration" type="number" placeholder="Duration in minutes" style="width:100%;">
-    </section>
+    <div class="section-card">
+      <h3><span class="section-icon" style="background:#e0e7ff;">📋</span> Test Details</h3>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label">Test Title *</label>
+          <input id="title" placeholder="e.g. Mid-Term Mathematics Exam" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Test Password *</label>
+          <input id="password" type="password" placeholder="Students need this to enter">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Duration (minutes) *</label>
+          <input id="duration" type="number" min="1" placeholder="e.g. 60">
+        </div>
+      </div>
+    </div>
 
     <!-- SETTINGS -->
-    <section class="card" style="margin-bottom:20px;">
-      <h3>Exam Settings</h3>
-
-      <label>
-        <input type="checkbox" id="shuffleQ" checked>
-        Shuffle Questions
-      </label>
-      <br><br>
-
-      <label>
-        <input type="checkbox" id="shuffleA" checked>
-        Shuffle Answers
-      </label>
-    </section>
+    <div class="section-card">
+      <h3><span class="section-icon" style="background:#d1fae5;">⚙️</span> Exam Settings</h3>
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <strong>Shuffle Questions</strong>
+          <span>Randomise question order for each student</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="shuffleQ" checked>
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <strong>Shuffle Answer Options</strong>
+          <span>Randomise MCQ/MSQ option order</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="shuffleA" checked>
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+    </div>
 
     <!-- SECURITY -->
-    <section class="card" style="margin-bottom:20px;">
-      <h3>Security Rules</h3>
-
-      <label>
-        <input type="checkbox" id="fullscreen" checked>
-        Enforce Fullscreen
-      </label>
-      <br><br>
-
-      <label>
-        <input type="checkbox" id="disableCopy" checked>
-        Disable Copy and Paste
-      </label>
-      <br><br>
-
-      <label>
-        <input type="checkbox" id="autoSubmitTab">
-        Auto submit on tab switch
-      </label>
-    </section>
+    <div class="section-card">
+      <h3><span class="section-icon" style="background:#fee2e2;">🔒</span> Security Rules</h3>
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <strong>Enforce Fullscreen</strong>
+          <span>Force browser into fullscreen mode</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="fullscreen" checked>
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <strong>Disable Copy &amp; Paste</strong>
+          <span>Block keyboard shortcuts and right-click</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="disableCopy" checked>
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <strong>Auto-Submit on Tab Switch</strong>
+          <span>Submit exam if student switches tabs</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="autoSubmitTab">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+    </div>
 
     <!-- QUESTIONS -->
-    <section class="card" style="margin-bottom:20px;">
-      <h3>Questions</h3>
+    <div class="section-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h3 style="margin-bottom:0;"><span class="section-icon" style="background:#fef3c7;">❓</span> Questions</h3>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-sm" onclick="addQuestion('MCQ')">＋ MCQ</button>
+          <button class="btn btn-sm" onclick="addQuestion('MSQ')">＋ MSQ</button>
+          <button class="btn btn-sm" onclick="addQuestion('NAT')">＋ NAT</button>
+        </div>
+      </div>
 
       <div id="questions"></div>
 
-      <button class="btn btn-primary" style="margin-top:12px;" onclick="addQuestion()">
-        Add Question
-      </button>
-
-      <p style="color:var(--muted); margin-top:10px;">
-        Supported types. MCQ, MSQ, NAT
-      </p>
-    </section>
-
-    <!-- ACTION -->
-    <section class="card center">
-      <button class="btn btn-primary" onclick="saveTest()">
-        Save Test
-      </button>
-    </section>
-
-    <!-- RESULT -->
-    <div id="resultBox"></div>
+      <div id="emptyQuestionsMsg" style="text-align:center; padding:32px; color:var(--muted); border:2px dashed var(--border); border-radius:12px;">
+        <div style="font-size:32px; margin-bottom:8px;">📝</div>
+        <div style="font-weight:600; margin-bottom:4px;">No questions yet</div>
+        <div style="font-size:13px;">Click MCQ, MSQ or NAT above to add your first question</div>
+        <div style="font-size:12px; margin-top:10px; color:#94a3b8;">
+          MCQ = Single correct · MSQ = Multiple correct · NAT = Numeric answer
+        </div>
+      </div>
+    </div>
 
   </main>
 
-  <!-- SCRIPT -->
-  <script src="create-test.js"></script>
+  <!-- PREVIEW MODAL -->
+  <div class="modal-overlay" id="previewModal">
+    <div class="modal-box" style="max-width:700px; max-height:85vh; overflow-y:auto;">
+      <div class="modal-header">
+        <span class="modal-title">Test Preview</span>
+        <button class="modal-close" onclick="closePreview()">✕</button>
+      </div>
+      <div id="previewContent"></div>
+    </div>
+  </div>
 
+  <script src="ui.js"></script>
+  <script src="create-test.js"></script>
 </body>
 </html>

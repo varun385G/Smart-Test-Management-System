@@ -10,6 +10,11 @@
   <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="responsive.css">
   <link rel="stylesheet" href="app.css">
+
+  <!-- Download Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 
 <body class="modern-ui">
@@ -19,9 +24,22 @@
 
     <!-- HEADER -->
     <section class="card" style="margin-bottom:20px;">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h2 style="margin:0;">Test Results</h2>
-        <button class="btn" onclick="goDashboard()">Back to Dashboard</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <div>
+          <h2 style="margin:0;">Test Results</h2>
+          <p id="testMeta" style="margin:4px 0 0; color:var(--muted); font-size:13px;"></p>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button id="btnDownloadExcel" class="btn btn-primary" onclick="downloadExcel()" disabled
+                  style="display:flex; align-items:center; gap:6px;">
+            ⬇ Download Excel
+          </button>
+          <button id="btnDownloadPdf" class="btn btn-primary" onclick="downloadPdf()" disabled
+                  style="display:flex; align-items:center; gap:6px;">
+            ⬇ Download PDF
+          </button>
+          <button class="btn" onclick="goDashboard()">Back to Dashboard</button>
+        </div>
       </div>
     </section>
 

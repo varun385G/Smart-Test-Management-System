@@ -13,22 +13,35 @@
   <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="responsive.css">
   <link rel="stylesheet" href="app.css">
+
+  <!-- Download Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 
 <body class="modern-ui">
 
   <!-- HEADER -->
   <header class="card" style="margin:16px;">
-    <div style="display:flex; align-items:center; justify-content:space-between;">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
       <div>
         <h2 style="margin:0;">Admin Results Dashboard</h2>
         <p style="margin:4px 0 0; color:var(--muted); font-size:14px;">
           View results grouped by staff and test
         </p>
       </div>
-      <button class="btn btn-primary" onclick="goBack()">
-        Back to Dashboard
-      </button>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <button id="btnDownloadAllExcel" class="btn btn-primary" onclick="downloadAllExcel()" disabled>
+          ⬇ All Results (Excel)
+        </button>
+        <button id="btnDownloadAllPdf" class="btn btn-primary" onclick="downloadAllPdf()" disabled>
+          ⬇ All Results (PDF)
+        </button>
+        <button class="btn btn-primary" onclick="goBack()">
+          Back to Dashboard
+        </button>
+      </div>
     </div>
   </header>
 

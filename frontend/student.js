@@ -1,86 +1,78 @@
-const form = document.getElementById("studentForm");
-const msgBox = document.getElementById("messageBox");
+async function handleSubmit() {
+  const testId   = document.getElementById('testId').value.trim().toUpperCase();
+  const password = document.getElementById('password').value.trim();
+  const reg      = document.getElementById('reg').value.trim();
+  const name     = document.getElementById('name').value.trim();
+  const msgBox   = document.getElementById('messageBox');
+  const btn      = document.getElementById('submitBtn');
 
-form.addEventListener("submit", async e => {
-  e.preventDefault();
+  if (!testId || !password || !reg || !name) {
+    msgBox.innerHTML = `<p style="color:var(--danger); font-size:13.5px; text-align:center;">All fields are required</p>`;
+    return;
+  }
 
-  const testId = document.getElementById("testId").value.trim();
-  const password = document.getElementById("password").value.trim();
-  const reg = document.getElementById("reg").value.trim();
-  const name = document.getElementById("name").value.trim();
-
-  msgBox.innerHTML = `<p style="color:var(--muted);">Validating...</p>`;
-
-  const submitBtn = form.querySelector("button[type='submit']");
-  submitBtn.disabled = true;
-  submitBtn.style.opacity = "0.6";
+  btn.disabled = true;
+  btn.textContent = 'Verifying…';
+  msgBox.innerHTML = '';
 
   try {
-    const res = await fetch("/api/student/validate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const res  = await fetch('/api/student/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ testId, password, reg })
     });
-
     const data = await res.json();
 
     if (!res.ok) {
-      msgBox.innerHTML = `
-        <p style="color:#dc2626;">
-          ${data.message || "Validation failed"}
-        </p>
-      `;
+      msgBox.innerHTML = `<div style="background:var(--danger-light); color:#991b1b; padding:12px 16px; border-radius:10px; font-size:13.5px; text-align:center;">${data.message || 'Validation failed'}</div>`;
       return;
     }
 
-    // Already attempted
     if (data.attempted) {
-      msgBox.innerHTML = `
-        <div class="card center">
-          <h3>Exam already attempted</h3>
-          ${
-            data.resultsPublished
-              ? `<button class="btn"
-                          onclick="viewResult('${testId}','${reg}')">
-                    View Result
-                 </button>`
-              : `<p style="color:var(--muted);">
-                    Results not published yet
-                 </p>`
-          }
-          <br><br>
-          <button class="btn" onclick="goHome()">
-            Back to Home
-          </button>
-        </div>
-      `;
+      if (data.resultsPublished) {
+        // Results published — show option to view result (and download PDF)
+        msgBox.innerHTML = `
+          <div class="card" style="text-align:center; padding:20px; border-color:var(--success);">
+            <div style="font-size:28px; margin-bottom:8px;">✅</div>
+            <div style="font-weight:700; margin-bottom:4px;">You've already attempted this exam</div>
+            <div style="color:var(--muted); font-size:13px; margin-bottom:16px;">Results have been published!</div>
+            <button class="btn btn-primary" style="width:100%; margin-bottom:8px;"
+                    onclick="viewResult('${testId}','${reg}')">
+              📊 View My Result & Download PDF
+            </button>
+            <button class="btn" style="width:100%;" onclick="location.href='/'">Back to Home</button>
+          </div>
+        `;
+      } else {
+        msgBox.innerHTML = `
+          <div class="card" style="text-align:center; padding:20px; border-color:var(--warning);">
+            <div style="font-size:28px; margin-bottom:8px;">⏳</div>
+            <div style="font-weight:700; margin-bottom:4px;">Exam Already Attempted</div>
+            <div style="color:var(--muted); font-size:13px; margin-bottom:16px;">Results have not been published yet. Check back later.</div>
+            <button class="btn" style="width:100%;" onclick="location.href='/'">Back to Home</button>
+          </div>
+        `;
+      }
       return;
     }
 
     // Fresh attempt
-    localStorage.setItem("testId", testId);
-    localStorage.setItem("studentName", name);
-    localStorage.setItem("studentReg", reg);
-
-    location.href = "/exam.html";
+    localStorage.setItem('testId', testId);
+    localStorage.setItem('studentName', name);
+    localStorage.setItem('studentReg', reg);
+    location.href = '/exam.html';
 
   } catch (err) {
-    console.error(err);
-    msgBox.innerHTML = `
-      <p style="color:#dc2626;">
-        Server error. Try again.
-      </p>
-    `;
+    msgBox.innerHTML = `<div style="background:var(--danger-light); color:#991b1b; padding:12px 16px; border-radius:10px; font-size:13.5px; text-align:center;">Server error. Please try again.</div>`;
   } finally {
-    submitBtn.disabled = false;
-    submitBtn.style.opacity = "1";
+    btn.disabled = false;
+    btn.textContent = 'Enter Exam →';
   }
-});
+}
 
 function viewResult(testId, reg) {
   location.href = `/student-result.html?testId=${testId}&reg=${reg}`;
 }
 
-function goHome() {
-  location.href = "/";
-}
+// Allow Enter key
+document.addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
