@@ -3,24 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Test Results</title>
-
-  <!-- Styles -->
+  <title>Test Results — STMS</title>
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="responsive.css">
   <link rel="stylesheet" href="app.css">
-
-  <!-- Download Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
-
 <body class="modern-ui">
-
-  <!-- PAGE CONTAINER -->
-  <main class="container" style="padding:24px; max-width:900px; margin:auto;">
+  <main class="container" style="padding:24px; max-width:960px; margin:auto;">
 
     <!-- HEADER -->
     <section class="card" style="margin-bottom:20px;">
@@ -30,26 +23,26 @@
           <p id="testMeta" style="margin:4px 0 0; color:var(--muted); font-size:13px;"></p>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button id="btnDownloadExcel" class="btn btn-primary" onclick="downloadExcel()" disabled
-                  style="display:flex; align-items:center; gap:6px;">
-            ⬇ Download Excel
-          </button>
-          <button id="btnDownloadPdf" class="btn btn-primary" onclick="downloadPdf()" disabled
-                  style="display:flex; align-items:center; gap:6px;">
-            ⬇ Download PDF
-          </button>
-          <button class="btn" onclick="goDashboard()">Back to Dashboard</button>
+          <button id="btnDownloadExcel" class="btn btn-primary" onclick="downloadExcel()" disabled>⬇ Excel</button>
+          <button id="btnDownloadPdf"   class="btn btn-primary" onclick="downloadPdf()"   disabled>⬇ PDF</button>
+          <button class="btn" onclick="goDashboard()">← Dashboard</button>
         </div>
       </div>
     </section>
 
+    <!-- TABS -->
+    <div style="display:flex; gap:4px; margin-bottom:16px; background:var(--bg); border-radius:12px; padding:4px; width:fit-content;">
+      <button id="tabResults"    class="btn btn-primary btn-sm" onclick="showTab('results')">📋 Results</button>
+      <button id="tabAnalytics"  class="btn btn-sm"             onclick="showTab('analytics')">📊 Analytics</button>
+    </div>
+
     <!-- RESULTS TABLE -->
-    <section class="card">
+    <section id="panelResults" class="card">
       <table class="table">
         <thead>
           <tr>
             <th>Student</th>
-            <th>Register No</th>
+            <th style="text-align:center;">Rank</th>
             <th>Score</th>
           </tr>
         </thead>
@@ -57,10 +50,24 @@
       </table>
     </section>
 
+    <!-- ANALYTICS PANEL -->
+    <section id="panelAnalytics" class="card" style="display:none;">
+      <h3 style="margin-bottom:16px;">Per-Question Difficulty Analysis</h3>
+      <div id="analyticsContainer">
+        <p style="color:var(--muted); text-align:center;">Loading analytics…</p>
+      </div>
+    </section>
+
   </main>
 
-  <!-- SCRIPT -->
+  <script>
+    function showTab(tab) {
+      document.getElementById('panelResults').style.display   = tab === 'results'   ? '' : 'none';
+      document.getElementById('panelAnalytics').style.display = tab === 'analytics' ? '' : 'none';
+      document.getElementById('tabResults').className   = tab === 'results'   ? 'btn btn-primary btn-sm' : 'btn btn-sm';
+      document.getElementById('tabAnalytics').className = tab === 'analytics' ? 'btn btn-primary btn-sm' : 'btn btn-sm';
+    }
+  </script>
   <script src="results.js"></script>
-
 </body>
 </html>

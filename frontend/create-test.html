@@ -60,6 +60,16 @@
           <label class="form-label">Duration (minutes) *</label>
           <input id="duration" type="number" min="1" placeholder="e.g. 60">
         </div>
+        <div class="form-group">
+          <label class="form-label">Scheduled Start <span style="color:var(--muted); font-weight:400;">(optional)</span></label>
+          <input id="scheduledStart" type="datetime-local" style="font-size:14px;">
+          <div style="font-size:11.5px; color:var(--muted); margin-top:4px;">Students cannot enter before this time</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Scheduled End <span style="color:var(--muted); font-weight:400;">(optional)</span></label>
+          <input id="scheduledEnd" type="datetime-local" style="font-size:14px;">
+          <div style="font-size:11.5px; color:var(--muted); margin-top:4px;">Students cannot enter after this time</div>
+        </div>
       </div>
     </div>
 
@@ -83,41 +93,6 @@
         </div>
         <label class="toggle-switch">
           <input type="checkbox" id="shuffleA" checked>
-          <span class="toggle-track"></span>
-        </label>
-      </div>
-    </div>
-
-    <!-- SECURITY -->
-    <div class="section-card">
-      <h3><span class="section-icon" style="background:#fee2e2;">🔒</span> Security Rules</h3>
-      <div class="toggle-row">
-        <div class="toggle-label">
-          <strong>Enforce Fullscreen</strong>
-          <span>Force browser into fullscreen mode</span>
-        </div>
-        <label class="toggle-switch">
-          <input type="checkbox" id="fullscreen" checked>
-          <span class="toggle-track"></span>
-        </label>
-      </div>
-      <div class="toggle-row">
-        <div class="toggle-label">
-          <strong>Disable Copy &amp; Paste</strong>
-          <span>Block keyboard shortcuts and right-click</span>
-        </div>
-        <label class="toggle-switch">
-          <input type="checkbox" id="disableCopy" checked>
-          <span class="toggle-track"></span>
-        </label>
-      </div>
-      <div class="toggle-row">
-        <div class="toggle-label">
-          <strong>Auto-Submit on Tab Switch</strong>
-          <span>Submit exam if student switches tabs</span>
-        </div>
-        <label class="toggle-switch">
-          <input type="checkbox" id="autoSubmitTab">
           <span class="toggle-track"></span>
         </label>
       </div>

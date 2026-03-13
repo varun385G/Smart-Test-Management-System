@@ -238,3 +238,22 @@
 .type-mcq  { background: var(--primary-light); color: var(--primary-dark); }
 .type-msq  { background: var(--purple-light);  color: #5b21b6; }
 .type-nat  { background: var(--orange-light);  color: #c2410c; }
+/* ── Negative marking row ─────────────────── */
+.neg-marking-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.neg-marking-row label { cursor: pointer; }
+.neg-value-wrap {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}

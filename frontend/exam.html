@@ -64,6 +64,13 @@
       transition: all 0.15s; display: flex; align-items: center; gap: 4px;
     }
     .flag-btn.flagged { background: #fff7ed; border-color: var(--warning); color: var(--warning); }
+    .badge-red { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
+    #negativeMarkingBanner {
+      background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px;
+      padding: 10px 16px; margin: 0 20px 12px; display: none;
+      font-size: 13px; color: #dc2626; font-weight: 600;
+      display: none; align-items: center; gap: 8px; max-width: 1100px; margin-inline: auto;
+    }
   </style>
 </head>
 <body>
@@ -84,6 +91,11 @@
     </div>
     <div id="timerDisplay">--:--</div>
   </header>
+
+  <!-- Negative marking warning banner -->
+  <div id="negativeMarkingBanner" style="display:none; background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:10px 16px; margin:12px 20px 0; font-size:13px; color:#dc2626; font-weight:600; align-items:center; gap:8px; max-width:1060px; margin-inline:auto;">
+    ⚠️ This exam has <strong>negative marking</strong> enabled on some questions. Wrong answers will deduct marks. See each question for details.
+  </div>
 
   <div class="exam-layout">
     <!-- Question area -->

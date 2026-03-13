@@ -75,12 +75,18 @@ function populateForm(test) {
   if (test.password) document.getElementById('password').value = test.password;
   if (test.duration) document.getElementById('duration').value  = test.duration;
 
-  const sec = test.security || {};
   document.getElementById('shuffleQ').checked     = test.shuffleQuestions !== false;
   document.getElementById('shuffleA').checked     = test.shuffleOptions   !== false;
-  document.getElementById('fullscreen').checked   = sec.fullscreen   !== false;
-  document.getElementById('disableCopy').checked  = sec.disableCopyPaste !== false;
-  document.getElementById('autoSubmitTab').checked = !!sec.autoSubmitOnTabChange;
+
+  // Restore schedule
+  if (document.getElementById('scheduledStart') && test.scheduledStart) {
+    const d = new Date(test.scheduledStart);
+    document.getElementById('scheduledStart').value = d.toISOString().slice(0,16);
+  }
+  if (document.getElementById('scheduledEnd') && test.scheduledEnd) {
+    const d = new Date(test.scheduledEnd);
+    document.getElementById('scheduledEnd').value = d.toISOString().slice(0,16);
+  }
 
   questionList = [];
   document.getElementById('questions').innerHTML = '';
@@ -123,6 +129,8 @@ function addQuestion(type = 'MCQ', prefill = null) {
     qData.type = e.target.value;
     refreshQBody(id, qData.type);
     refreshQHeader(id, getQNum(id), qData.type);
+    // Hide neg marking for MSQ (uses own partial logic)
+    updateNegRowVisibility(id, qData.type);
     markDirty();
   };
 
@@ -131,6 +139,16 @@ function addQuestion(type = 'MCQ', prefill = null) {
     qData.marks = Number(e.target.value) || 1;
     markDirty(); updateCounter();
   };
+
+  // Negative marking toggle
+  const negEnabledEl = card.querySelector('.q-neg-enabled');
+  const negValueWrap = document.getElementById(`negValueWrap-${id}`);
+  if (negEnabledEl && negValueWrap) {
+    negEnabledEl.onchange = () => {
+      negValueWrap.style.display = negEnabledEl.checked ? 'flex' : 'none';
+      markDirty();
+    };
+  }
 
   // Wire collapse
   card.querySelector('.q-header').addEventListener('click', e => {
@@ -152,7 +170,21 @@ function addQuestion(type = 'MCQ', prefill = null) {
     if (explEl && prefill.explanation) explEl.value = prefill.explanation;
     // Image
     if (prefill.image) setImagePreview(card, prefill.image);
+    // Negative marking prefill
+    const negEl = card.querySelector('.q-neg-enabled');
+    const negMarksEl = card.querySelector('.q-neg-marks');
+    const negWrap = document.getElementById(`negValueWrap-${id}`);
+    if (negEl && prefill.negativeMarkingEnabled) {
+      negEl.checked = true;
+      if (negWrap) negWrap.style.display = 'flex';
+    }
+    if (negMarksEl && prefill.negativeMarks !== undefined) {
+      negMarksEl.value = prefill.negativeMarks;
+    }
   }
+
+  // Set initial neg row visibility based on type
+  updateNegRowVisibility(id, qData.type);
 
   markDirty(); updateCounter();
   return card;
@@ -182,6 +214,19 @@ function buildQuestionHTML(id, type) {
         <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
           <label style="font-size:12.5px; font-weight:600; color:var(--muted); white-space:nowrap;">Marks</label>
           <input type="number" class="q-marks-input" value="1" min="1" max="99">
+        </div>
+      </div>
+
+      <!-- Negative marking row (shown for MCQ/NAT, hidden for MSQ) -->
+      <div class="neg-marking-row" id="negRow-${id}" style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:var(--bg); border-radius:8px; border:1px solid var(--border); margin-bottom:2px;">
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px; font-weight:600;">
+          <input type="checkbox" class="q-neg-enabled" id="negEnabled-${id}" style="width:14px; height:14px;">
+          Enable Negative Marking
+        </label>
+        <div class="neg-value-wrap" id="negValueWrap-${id}" style="display:none; align-items:center; gap:6px;">
+          <label style="font-size:12px; color:var(--muted);">Deduct</label>
+          <input type="number" class="q-neg-marks" id="negMarks-${id}" value="0.5" min="0" max="99" step="0.25" style="width:70px; font-size:13px; padding:4px 8px; border-radius:6px; border:1px solid var(--border);">
+          <label style="font-size:12px; color:var(--muted);">marks for wrong answer</label>
         </div>
       </div>
 
@@ -294,6 +339,17 @@ function wireQInputs(card) {
       if (preview) preview.textContent = textEl.value || 'New question';
       markDirty();
     };
+  }
+}
+
+function updateNegRowVisibility(id, type) {
+  const negRow = document.getElementById(`negRow-${id}`);
+  if (!negRow) return;
+  // MSQ uses its own partial logic — negative marking not applicable
+  if (type === 'MSQ') {
+    negRow.style.display = 'none';
+  } else {
+    negRow.style.display = 'flex';
   }
 }
 
@@ -416,6 +472,17 @@ function extractQuestion(id) {
 
   const qObj = { type, question: questionText, image, marks, explanation };
 
+  // Negative marking (only for MCQ and NAT)
+  if (type !== 'MSQ') {
+    const negEnabled = card.querySelector('.q-neg-enabled')?.checked || false;
+    const negMarks   = Number(card.querySelector('.q-neg-marks')?.value) || 0;
+    qObj.negativeMarkingEnabled = negEnabled;
+    qObj.negativeMarks = negEnabled ? negMarks : 0;
+  } else {
+    qObj.negativeMarkingEnabled = false;
+    qObj.negativeMarks = 0;
+  }
+
   if (type === 'MCQ') {
     const optInputs = card.querySelectorAll(`#optlist-${id} .option-row input[type="text"]`);
     const radios    = card.querySelectorAll(`#optlist-${id} input[type="radio"]`);
@@ -460,15 +527,15 @@ function collectFormData(validate = true) {
   const cards = [...document.querySelectorAll('.question-card')];
   const questions = cards.map(card => extractQuestion(Number(card.dataset.qid)));
 
+  const scheduledStartVal = document.getElementById('scheduledStart')?.value;
+  const scheduledEndVal   = document.getElementById('scheduledEnd')?.value;
+
   return {
     title, password, duration, questions,
     shuffleQuestions: document.getElementById('shuffleQ').checked,
     shuffleOptions:   document.getElementById('shuffleA').checked,
-    security: {
-      fullscreen:             document.getElementById('fullscreen').checked,
-      disableCopyPaste:       document.getElementById('disableCopy').checked,
-      autoSubmitOnTabChange:  document.getElementById('autoSubmitTab').checked,
-    }
+    scheduledStart: scheduledStartVal || null,
+    scheduledEnd:   scheduledEndVal   || null,
   };
 }
 
