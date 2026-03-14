@@ -11,6 +11,11 @@ async function handleSubmit() {
     return;
   }
 
+  if (!/^\d{13}$/.test(reg)) {
+    msgBox.innerHTML = `<p style="color:var(--danger); font-size:13.5px; text-align:center;">Register Number must be exactly 13 digits (numbers only)</p>`;
+    return;
+  }
+
   btn.disabled = true;
   btn.textContent = 'Verifying…';
   msgBox.innerHTML = '';

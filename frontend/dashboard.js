@@ -6,9 +6,113 @@ if (!role || !staffName) window.location.href = '/staff.html';
 
 document.getElementById('staffName').innerText = 'Welcome, ' + staffName;
 document.getElementById('staffRole').innerText  = role === 'admin' ? '🛡 Admin' : '👤 Staff';
+document.getElementById('profileInitial').innerText = staffName ? staffName[0].toUpperCase() : '?';
 
 if (role === 'admin') {
   document.querySelectorAll('.admin-only').forEach(e => e.style.display = '');
+}
+
+/* ── Profile dropdown ─────────────────────── */
+function toggleProfileMenu() {
+  const menu = document.getElementById('profileMenu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', (e) => {
+  if (!document.getElementById('profileBtn').contains(e.target)) {
+    document.getElementById('profileMenu').style.display = 'none';
+  }
+});
+
+/* ── Modal helpers ────────────────────────── */
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+['changeEmailModal','changePasswordModal'].forEach(id => {
+  document.getElementById(id).addEventListener('click', function(e) {
+    if (e.target === this) closeModal(id);
+  });
+});
+
+/* ── Change Email ─────────────────────────── */
+function openChangeEmail() {
+  document.getElementById('profileMenu').style.display = 'none';
+  document.getElementById('ceCurrentPw').value = '';
+  document.getElementById('ceNewEmail').value = '';
+  document.getElementById('ceMsg').innerText = '';
+  document.getElementById('changeEmailModal').classList.add('open');
+}
+async function submitChangeEmail() {
+  const currentPassword = document.getElementById('ceCurrentPw').value.trim();
+  const newEmail        = document.getElementById('ceNewEmail').value.trim();
+  const msg             = document.getElementById('ceMsg');
+  msg.innerText = '';
+
+  if (!currentPassword || !newEmail) {
+    msg.style.color = 'var(--danger)'; msg.innerText = 'All fields required.'; return;
+  }
+  const btn = document.querySelector('#changeEmailModal .btn-primary');
+  btn.disabled = true; btn.textContent = 'Updating...';
+  try {
+    const res = await fetch('/api/staff/update-credentials', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId, currentPassword, newEmail })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.style.color = 'var(--success)';
+      msg.innerText = 'Email updated! Please log in again.';
+      setTimeout(() => { localStorage.clear(); window.location.href = '/staff.html'; }, 1500);
+    } else {
+      msg.style.color = 'var(--danger)'; msg.innerText = data.message || 'Failed.';
+    }
+  } catch { msg.style.color = 'var(--danger)'; msg.innerText = 'Network error.'; }
+  finally { btn.disabled = false; btn.textContent = 'Update Email'; }
+}
+
+/* ── Change Password ──────────────────────── */
+function openChangePassword() {
+  document.getElementById('profileMenu').style.display = 'none';
+  document.getElementById('cpCurrentPw').value = '';
+  document.getElementById('cpNewPw').value = '';
+  document.getElementById('cpConfirmPw').value = '';
+  document.getElementById('cpMsg').innerText = '';
+  document.getElementById('changePasswordModal').classList.add('open');
+}
+async function submitChangePassword() {
+  const currentPassword = document.getElementById('cpCurrentPw').value.trim();
+  const newPassword     = document.getElementById('cpNewPw').value.trim();
+  const confirmPassword = document.getElementById('cpConfirmPw').value.trim();
+  const msg             = document.getElementById('cpMsg');
+  msg.innerText = '';
+
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    msg.style.color = 'var(--danger)'; msg.innerText = 'All fields required.'; return;
+  }
+  if (newPassword !== confirmPassword) {
+    msg.style.color = 'var(--danger)'; msg.innerText = 'New passwords do not match.'; return;
+  }
+  if (newPassword.length < 4) {
+    msg.style.color = 'var(--danger)'; msg.innerText = 'Password must be at least 4 characters.'; return;
+  }
+  const btn = document.querySelector('#changePasswordModal .btn-primary');
+  btn.disabled = true; btn.textContent = 'Updating...';
+  try {
+    const res = await fetch('/api/staff/update-credentials', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId, currentPassword, newPassword })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.style.color = 'var(--success)';
+      msg.innerText = 'Password updated! Please log in again.';
+      setTimeout(() => { localStorage.clear(); window.location.href = '/staff.html'; }, 1500);
+    } else {
+      msg.style.color = 'var(--danger)'; msg.innerText = data.message || 'Failed.';
+    }
+  } catch { msg.style.color = 'var(--danger)'; msg.innerText = 'Network error.'; }
+  finally { btn.disabled = false; btn.textContent = 'Update Password'; }
 }
 
 /* ── Load stats ───────────────────────────── */
@@ -45,7 +149,6 @@ async function loadStats() {
       </div>
     `).join('');
 
-    /* Activity feed */
     const feed = document.getElementById('activityFeed');
     if (tests.length === 0) {
       feed.innerHTML = '<span>No activity yet. Create your first test!</span>';

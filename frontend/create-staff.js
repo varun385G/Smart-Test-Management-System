@@ -24,23 +24,24 @@ async function createStaff() {
     return;
   }
 
-  const btn = document.querySelector(".admin-only button");
+  const btn = document.querySelector("button.btn-primary") || document.querySelector(".btn-primary");
   btn.disabled = true;
   btn.style.opacity = "0.6";
-  btn.innerText = "Creating...";
+  btn.textContent = "Creating...";
 
   try {
     const res = await fetch("/api/admin/create-staff", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password })
+      body: JSON.stringify({ name, email, password, role: "staff" })
     });
 
     const data = await res.json();
 
     if (res.ok) {
-      alert("Staff created successfully");
-      window.location.href = "/dashboard.html";
+      msg.innerText = "Staff created successfully!";
+      msg.style.color = "var(--success)";
+      setTimeout(() => window.location.href = "/dashboard.html", 1200);
     } else {
       msg.innerText = data.message || "Failed to create staff";
       msg.style.color = "#dc2626";
@@ -51,7 +52,7 @@ async function createStaff() {
   } finally {
     btn.disabled = false;
     btn.style.opacity = "1";
-    btn.innerText = "Create Staff";
+    btn.textContent = "Create Staff";
   }
 }
 

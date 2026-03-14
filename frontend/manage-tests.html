@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
+
   <header class="header">
     <div style="display:flex; align-items:center; gap:10px;">
       <button class="btn btn-ghost btn-sm" onclick="goBack()">← Back</button>
@@ -18,12 +19,12 @@
 
   <main style="max-width:1100px; margin:auto; padding:24px 20px;">
 
-    <!-- Search & filter bar -->
+    <!-- Search & filter -->
     <div class="section-card" style="margin-bottom:20px; padding:14px 18px;">
       <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
         <input id="searchInput" placeholder="🔍  Search by title or test ID…"
                oninput="filterTests()" style="max-width:280px; flex:1;">
-        <select id="filterStatus" onchange="filterTests()" style="width:auto; flex-shrink:0;">
+        <select id="filterStatus" onchange="filterTests()" style="width:auto; flex-shrink:0; padding:10px 12px; border:1.5px solid var(--border); border-radius:10px; font-size:14px; background:var(--bg); color:var(--text); font-family:var(--font-main);">
           <option value="all">All Tests</option>
           <option value="published">Published</option>
           <option value="unpublished">Unpublished</option>
@@ -31,7 +32,7 @@
       </div>
     </div>
 
-    <!-- Table card -->
+    <!-- Table -->
     <div class="section-card">
       <table class="table" id="testTableWrap">
         <thead>
@@ -40,7 +41,7 @@
             <th>Title</th>
             <th>Status</th>
             <th>Attempts</th>
-            <th style="width:220px;">Actions</th>
+            <th style="width:240px;">Actions</th>
           </tr>
         </thead>
         <tbody id="testTable">
@@ -52,8 +53,10 @@
       <div id="emptyMsg" style="display:none; text-align:center; padding:40px; color:var(--muted);">
         <div style="font-size:32px; margin-bottom:8px;">📋</div>
         <div style="font-weight:600;">No tests found</div>
+        <div style="font-size:13px; margin-top:4px;">Create your first test to get started</div>
       </div>
     </div>
+
   </main>
 
   <script src="ui.js"></script>

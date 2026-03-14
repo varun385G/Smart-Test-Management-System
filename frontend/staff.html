@@ -3,96 +3,65 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Staff Login</title>
-
-  <!-- Styles -->
-  <link rel="stylesheet" href="theme.css">
-  <link rel="stylesheet" href="ui.css">
-  <link rel="stylesheet" href="responsive.css">
+  <title>Staff Login — STMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
 </head>
+<body style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#e0e7ff 0%,#f0fdf4 100%);">
 
-<body class="modern-ui">
+  <div style="width:100%; max-width:400px; padding:20px;">
+    <div style="text-align:center; margin-bottom:28px;">
+      <div style="width:56px;height:56px;background:var(--primary);border-radius:16px;display:inline-flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:24px;margin-bottom:12px;">S</div>
+      <h1 style="font-size:22px; font-weight:800; margin-bottom:4px;">Staff Login</h1>
+      <p style="color:var(--muted); font-size:14px;">Enter your credentials to continue</p>
+    </div>
 
-  <!-- PAGE CONTAINER -->
-  <main class="container" style="padding:24px; max-width:420px; margin:auto;">
+    <div class="card" style="padding:28px;">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input id="email" type="email" placeholder="Enter your email" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input id="password" type="password" placeholder="Enter your password">
+      </div>
+      <button class="btn btn-primary" style="width:100%; margin-top:4px;" onclick="login()">Login →</button>
+      <p id="msg" style="color:var(--danger); margin-top:12px; font-size:13.5px; text-align:center;"></p>
+    </div>
 
-    <!-- LOGIN CARD -->
-    <section class="card">
+    <p style="text-align:center; margin-top:16px; font-size:13px; color:var(--muted);">
+      Student? <a href="/student.html" style="color:var(--primary); font-weight:600;">Student Access →</a>
+    </p>
+  </div>
 
-      <h2 style="margin-top:0;">Staff Login</h2>
-      <p style="color:var(--muted);">
-        Enter your staff credentials to continue
-      </p>
-
-      <input
-        id="email"
-        type="email"
-        placeholder="Email"
-        style="width:100%; margin-bottom:12px;"
-      >
-
-      <input
-        id="password"
-        type="password"
-        placeholder="Password"
-        style="width:100%; margin-bottom:12px;"
-      >
-
-      <button
-        class="btn btn-primary"
-        style="width:100%;"
-        onclick="login()"
-      >
-        Login
-      </button>
-
-      <p id="msg" style="color:#dc2626; margin-top:12px;"></p>
-
-    </section>
-
-  </main>
-
-  <!-- SCRIPT -->
+  <script src="ui.js"></script>
   <script>
     async function login() {
-      const email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value.trim();
-      const msg = document.getElementById("msg");
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const msg      = document.getElementById('msg');
+      msg.textContent = '';
 
-      msg.innerText = "";
-
-      if (!email || !password) {
-        msg.innerText = "Please enter email and password";
-        return;
-      }
+      if (!email || !password) { msg.textContent = 'Please enter email and password'; return; }
 
       try {
-        const res = await fetch("/api/staff/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        const res  = await fetch('/api/staff/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
         });
-
         const data = await res.json();
+        if (!res.ok) { msg.textContent = data.message || 'Login failed'; return; }
 
-        if (!res.ok) {
-          msg.innerText = data.message || "Login failed";
-          return;
-        }
-
-        localStorage.setItem("staffId", data.staffId);
-        localStorage.setItem("staffName", data.name);
-        localStorage.setItem("staffRole", data.role);
-
-        window.location.href = "/dashboard.html";
-
-      } catch (err) {
-        console.error(err);
-        msg.innerText = "Server error. Try again.";
+        localStorage.setItem('staffId',   data.staffId);
+        localStorage.setItem('staffName', data.name);
+        localStorage.setItem('staffRole', data.role);
+        window.location.href = '/dashboard.html';
+      } catch {
+        msg.textContent = 'Server error. Try again.';
       }
     }
+    document.addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
   </script>
-
 </body>
 </html>

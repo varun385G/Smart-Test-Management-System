@@ -1,7 +1,7 @@
 const staffId = localStorage.getItem("staffId");
 
 if (!staffId) {
-  window.location.href = "/staff";
+  window.location.href = "/staff.html";
 }
 
 function goBack() {

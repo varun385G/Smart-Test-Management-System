@@ -9,7 +9,8 @@ const crypto    = require('crypto');
 
 const Result = require('./models/Result');
 const Staff  = require('./models/Staff');
-const Test   = require('./models/Test');
+const Test         = require('./models/Test');
+const QuestionBank = require('./models/QuestionBank');
 
 const app = express();
 app.use(cors());
@@ -58,6 +59,53 @@ app.delete('/api/admin/staff/:id', async (req, res) => {
   res.json({ message: 'Staff deleted' });
 });
 
+/* ─────────────── ADMIN: RESET STAFF PASSWORD ─────────────── */
+app.put('/api/admin/staff/:id/reset-password', async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 4)
+      return res.status(400).json({ message: 'Password must be at least 4 characters' });
+    const hashed = await bcrypt.hash(newPassword, 10);
+    const staff = await Staff.findByIdAndUpdate(req.params.id, { password: hashed });
+    if (!staff) return res.status(404).json({ message: 'Staff not found' });
+    res.json({ message: 'Password reset successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to reset password' });
+  }
+});
+
+/* ─────────────── STAFF: UPDATE OWN EMAIL OR PASSWORD ─────────────── */
+app.put('/api/staff/update-credentials', async (req, res) => {
+  try {
+    const { staffId, currentPassword, newEmail, newPassword } = req.body;
+    if (!staffId || !currentPassword)
+      return res.status(400).json({ message: 'Missing required fields' });
+
+    const staff = await Staff.findById(staffId);
+    if (!staff) return res.status(404).json({ message: 'Staff not found' });
+
+    const match = await bcrypt.compare(currentPassword, staff.password);
+    if (!match) return res.status(401).json({ message: 'Current password is incorrect' });
+
+    if (newEmail) {
+      const exists = await Staff.findOne({ email: newEmail });
+      if (exists && exists._id.toString() !== staffId)
+        return res.status(409).json({ message: 'That email is already in use' });
+      staff.email = newEmail;
+    }
+    if (newPassword) {
+      if (newPassword.length < 4)
+        return res.status(400).json({ message: 'New password must be at least 4 characters' });
+      staff.password = await bcrypt.hash(newPassword, 10);
+    }
+
+    await staff.save();
+    res.json({ message: 'Credentials updated successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update credentials' });
+  }
+});
+
 /* ─────────────── CREATE TEST ─────────────── */
 function generateTestId() {
   return 'ST-' + Math.floor(100000 + Math.random() * 900000);
@@ -65,7 +113,7 @@ function generateTestId() {
 
 app.post('/api/tests/create', async (req, res) => {
   try {
-    const { title, password, duration, questions, security, shuffleQuestions, shuffleOptions, staffId, scheduledStart, scheduledEnd } = req.body;
+    const { title, password, duration, questions, security, shuffleQuestions, shuffleOptions, staffId, scheduledStart, scheduledEnd, submitAfterMinutes } = req.body;
     const test = new Test({
       testId: generateTestId(),
       title, password, duration,
@@ -77,6 +125,7 @@ app.post('/api/tests/create', async (req, res) => {
       resultsPublished: false,
       scheduledStart: scheduledStart ? new Date(scheduledStart) : null,
       scheduledEnd:   scheduledEnd   ? new Date(scheduledEnd)   : null,
+      submitAfterMinutes: submitAfterMinutes ? Number(submitAfterMinutes) : null,
     });
     await test.save();
     res.json({ testId: test.testId });
@@ -92,7 +141,7 @@ app.put('/api/tests/:testId/update', async (req, res) => {
     const test = await Test.findOne({ testId: req.params.testId });
     if (!test) return res.status(404).json({ message: 'Test not found' });
 
-    const { title, password, duration, questions, security, shuffleQuestions, shuffleOptions, scheduledStart, scheduledEnd } = req.body;
+    const { title, password, duration, questions, security, shuffleQuestions, shuffleOptions, scheduledStart, scheduledEnd, submitAfterMinutes } = req.body;
     if (title)    test.title    = title;
     if (password) test.password = password;
     if (duration) test.duration = Number(duration);
@@ -102,6 +151,7 @@ app.put('/api/tests/:testId/update', async (req, res) => {
     if (shuffleOptions   !== undefined) test.shuffleOptions   = shuffleOptions;
     test.scheduledStart = scheduledStart ? new Date(scheduledStart) : null;
     test.scheduledEnd   = scheduledEnd   ? new Date(scheduledEnd)   : null;
+    test.submitAfterMinutes = submitAfterMinutes ? Number(submitAfterMinutes) : null;
 
     await test.save();
     res.json({ message: 'Test updated', testId: test.testId });
@@ -111,11 +161,17 @@ app.put('/api/tests/:testId/update', async (req, res) => {
   }
 });
 
-/* ─────────────── FETCH TEST ─────────────── */
-app.get('/api/tests/:testId', async (req, res) => {
-  const test = await Test.findOne({ testId: req.params.testId });
-  if (!test) return res.status(404).json({ message: 'Test not found' });
-  res.json(test);
+/* ─────────────── STAFF RESULTS STATS ─────────────── */
+app.get('/api/results/by-staff/:staffId', async (req, res) => {
+  try {
+    const tests = await Test.find({ createdBy: req.params.staffId });
+    const testIds = tests.map(t => t.testId);
+    // Exclude results with total=0 to prevent divide-by-zero on the dashboard
+    const results = await Result.find({ testId: { $in: testIds }, total: { $gt: 0 } });
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed' });
+  }
 });
 
 /* ─────────────── TESTS BY STAFF ─────────────── */
@@ -140,17 +196,11 @@ app.get('/api/tests/by-staff/:staffId', async (req, res) => {
   res.json(enriched);
 });
 
-/* ─────────────── STAFF RESULTS STATS ─────────────── */
-app.get('/api/results/by-staff/:staffId', async (req, res) => {
-  try {
-    const tests = await Test.find({ createdBy: req.params.staffId });
-    const testIds = tests.map(t => t.testId);
-    // Exclude results with total=0 to prevent divide-by-zero on the dashboard
-    const results = await Result.find({ testId: { $in: testIds }, total: { $gt: 0 } });
-    res.json(results);
-  } catch (err) {
-    res.status(500).json({ message: 'Failed' });
-  }
+/* ─────────────── FETCH TEST ─────────────── */
+app.get('/api/tests/:testId', async (req, res) => {
+  const test = await Test.findOne({ testId: req.params.testId });
+  if (!test) return res.status(404).json({ message: 'Test not found' });
+  res.json(test);
 });
 
 /* ─────────────── DELETE TEST ─────────────── */
@@ -592,6 +642,55 @@ app.get('/api/admin/results/grouped', async (req, res) => {
     });
   });
   res.json(grouped);
+});
+
+
+/* ─────────────── QUESTION BANK ─────────────── */
+app.get('/api/question-bank/subjects', async (req, res) => {
+  try {
+    const subjects = await QuestionBank.distinct('subject');
+    res.json(subjects);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch subjects' });
+  }
+});
+
+app.get('/api/question-bank', async (req, res) => {
+  try {
+    const { subject, topic } = req.query;
+    const filter = {};
+    if (subject) filter.subject = subject;
+    if (topic)   filter.topic   = { $regex: topic, $options: 'i' };
+    const questions = await QuestionBank.find(filter).sort({ createdAt: -1 });
+    res.json(questions);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch question bank' });
+  }
+});
+
+app.post('/api/question-bank', async (req, res) => {
+  try {
+    const { subject, topic, type, question, image, options, correctIndex, correctIndexes, correctValue, marks, negativeMarkingEnabled, negativeMarks, explanation, staffId } = req.body;
+    if (!question) return res.status(400).json({ message: 'Question text is required' });
+    const q = await QuestionBank.create({
+      subject: subject || 'General', topic: topic || '',
+      type, question, image, options, correctIndex, correctIndexes,
+      correctValue, marks, negativeMarkingEnabled, negativeMarks,
+      explanation, createdBy: staffId
+    });
+    res.json({ message: 'Saved to question bank', id: q._id });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to save question' });
+  }
+});
+
+app.delete('/api/question-bank/:id', async (req, res) => {
+  try {
+    await QuestionBank.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Deleted from question bank' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete' });
+  }
 });
 
 /* ─────────────── FRONTEND ─────────────── */

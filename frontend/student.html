@@ -31,7 +31,7 @@
       </div>
       <div class="form-group">
         <label class="form-label">Register Number</label>
-        <input id="reg" placeholder="e.g. 21CS001">
+        <input id="reg" placeholder="Enter 13-digit Register Number" type="text" inputmode="numeric" pattern="[0-9]{13}" maxlength="13" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
       </div>
 
       <button class="btn btn-primary" style="width:100%; margin-top:4px;" onclick="handleSubmit()" id="submitBtn">

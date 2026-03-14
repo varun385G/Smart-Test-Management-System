@@ -87,6 +87,9 @@ function populateForm(test) {
     const d = new Date(test.scheduledEnd);
     document.getElementById('scheduledEnd').value = d.toISOString().slice(0,16);
   }
+  if (document.getElementById('submitAfterMinutes') && test.submitAfterMinutes) {
+    document.getElementById('submitAfterMinutes').value = test.submitAfterMinutes;
+  }
 
   questionList = [];
   document.getElementById('questions').innerHTML = '';
@@ -527,8 +530,9 @@ function collectFormData(validate = true) {
   const cards = [...document.querySelectorAll('.question-card')];
   const questions = cards.map(card => extractQuestion(Number(card.dataset.qid)));
 
-  const scheduledStartVal = document.getElementById('scheduledStart')?.value;
-  const scheduledEndVal   = document.getElementById('scheduledEnd')?.value;
+  const scheduledStartVal       = document.getElementById('scheduledStart')?.value;
+  const scheduledEndVal         = document.getElementById('scheduledEnd')?.value;
+  const submitAfterMinutesVal   = document.getElementById('submitAfterMinutes')?.value;
 
   return {
     title, password, duration, questions,
@@ -536,6 +540,7 @@ function collectFormData(validate = true) {
     shuffleOptions:   document.getElementById('shuffleA').checked,
     scheduledStart: scheduledStartVal || null,
     scheduledEnd:   scheduledEndVal   || null,
+    submitAfterMinutes: submitAfterMinutesVal ? Number(submitAfterMinutesVal) : null,
   };
 }
 
@@ -654,4 +659,182 @@ function goBack() {
   } else {
     location.href = '/manage-tests.html';
   }
+}
+/* ══════════════════════════════════════════
+   QUESTION BANK — Import from own past tests
+══════════════════════════════════════════ */
+let bankTestList    = [];
+let bankQuestions   = [];
+let selectedBankIds = new Set();
+let selectedTestId  = null;
+
+async function openBankModal() {
+  selectedBankIds.clear();
+  selectedTestId = null;
+  bankQuestions  = [];
+  updateBankSelectedCount();
+
+  document.getElementById('bankModal').classList.add('open');
+  document.getElementById('bankTestList').innerHTML    = '<div style="color:var(--muted); font-size:13px; padding:8px 0;">Loading your tests…</div>';
+  document.getElementById('bankQuestionList').innerHTML = '';
+  document.getElementById('bankQuestionsSection').style.display = 'none';
+
+  const staffId = localStorage.getItem('staffId');
+  try {
+    const res = await fetch(`/api/tests/by-staff/${staffId}`);
+    bankTestList = await res.json();
+    if (editingTestId) bankTestList = bankTestList.filter(t => t.testId !== editingTestId);
+    renderBankTestList();
+  } catch {
+    showToast('Failed to load your tests', 'error');
+  }
+}
+
+function closeBankModal() {
+  document.getElementById('bankModal').classList.remove('open');
+}
+
+function renderBankTestList() {
+  const container = document.getElementById('bankTestList');
+  if (!bankTestList.length) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:24px; color:var(--muted); font-size:13px;">
+        <div style="font-size:28px; margin-bottom:8px;">📭</div>
+        No previous tests found. Save a test first to reuse its questions.
+      </div>`;
+    return;
+  }
+  container.innerHTML = bankTestList.map(t => `
+    <div onclick="selectBankTest('${t.testId}', this)"
+         id="bankTestItem-${t.testId}"
+         style="padding:12px 16px; border:2px solid var(--border); border-radius:10px; margin-bottom:8px; cursor:pointer; transition:all 0.15s;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-weight:700; font-size:14px;">${t.title}</div>
+          <div style="font-size:12px; color:var(--muted); margin-top:2px;">
+            Test ID: <strong>${t.testId}</strong> &nbsp;·&nbsp; ${t.attempts} attempt${t.attempts!==1?'s':''}
+          </div>
+        </div>
+        <span style="font-size:18px; color:var(--primary);">▶</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function selectBankTest(testId, el) {
+  document.querySelectorAll('[id^="bankTestItem-"]').forEach(item => {
+    item.style.borderColor = 'var(--border)';
+    item.style.background  = '';
+  });
+  el.style.borderColor = 'var(--primary)';
+  el.style.background  = 'var(--primary-light)';
+
+  selectedTestId = testId;
+  selectedBankIds.clear();
+  updateBankSelectedCount();
+
+  const section = document.getElementById('bankQuestionsSection');
+  const qList   = document.getElementById('bankQuestionList');
+  section.style.display = 'flex';
+  document.getElementById('bankEmptyRight').style.display = 'none';
+  qList.innerHTML = '<div style="color:var(--muted); font-size:13px; padding:8px 0;">Loading questions…</div>';
+
+  try {
+    const res  = await fetch(`/api/tests/${testId}`);
+    const test = await res.json();
+    bankQuestions = test.questions || [];
+    renderBankQuestions(test.title);
+  } catch {
+    showToast('Failed to load questions', 'error');
+  }
+}
+
+function renderBankQuestions(testTitle) {
+  const qList = document.getElementById('bankQuestionList');
+  document.getElementById('bankQuestionsTitle').textContent = `Questions from "${testTitle}"`;
+
+  if (!bankQuestions.length) {
+    qList.innerHTML = '<div style="color:var(--muted); font-size:13px; padding:8px 0;">This test has no questions.</div>';
+    return;
+  }
+
+  qList.innerHTML = `
+    <div style="padding:8px 12px; background:var(--bg); border-radius:8px; margin-bottom:10px; display:flex; align-items:center; gap:8px; border:1px solid var(--border);">
+      <input type="checkbox" id="selectAllBank" onchange="toggleSelectAllBank(this)">
+      <label for="selectAllBank" style="font-size:13px; font-weight:600; cursor:pointer;">
+        Select All (${bankQuestions.length} questions)
+      </label>
+    </div>
+    ${bankQuestions.map((q, i) => `
+      <div onclick="toggleBankSelect(${i}, this)"
+           id="bankQItem-${i}"
+           style="padding:12px 14px; border:2px solid var(--border); border-radius:10px; margin-bottom:8px; cursor:pointer; transition:all 0.15s;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+          <div style="flex:1;">
+            <div style="display:flex; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
+              <span style="font-size:12px; font-weight:700; color:var(--muted);">Q${i+1}</span>
+              <span class="badge ${q.type==='MCQ'?'badge-blue':q.type==='MSQ'?'badge-purple':'badge-orange'}">${q.type}</span>
+              <span class="badge badge-gray">${q.marks||1} mark${(q.marks||1)!==1?'s':''}</span>
+            </div>
+            <div style="font-size:13.5px; font-weight:500;">${q.question}</div>
+            ${q.type !== 'NAT' ? `
+              <div style="font-size:12px; color:var(--muted); margin-top:4px;">
+                ${(q.options||[]).map((o,oi) => {
+                  const correct = q.type==='MCQ' ? q.correctIndex===oi : (q.correctIndexes||[]).includes(oi);
+                  return '<span style="margin-right:10px;' + (correct?' color:var(--success);font-weight:600;':'') + '">' + (correct?'✓ ':'') + o + '</span>';
+                }).join('')}
+              </div>` :
+              `<div style="font-size:12px; color:var(--muted); margin-top:4px;">Answer: <strong>${q.correctValue}</strong></div>`
+            }
+          </div>
+          <div style="font-size:18px; flex-shrink:0;">⬜</div>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function toggleSelectAllBank(checkbox) {
+  bankQuestions.forEach((_, i) => {
+    const el = document.getElementById(`bankQItem-${i}`);
+    if (checkbox.checked) {
+      selectedBankIds.add(i);
+      if (el) { el.style.borderColor = 'var(--primary)'; el.style.background = 'var(--primary-light)'; el.querySelector('div:last-child').textContent = '✅'; }
+    } else {
+      selectedBankIds.delete(i);
+      if (el) { el.style.borderColor = 'var(--border)'; el.style.background = ''; el.querySelector('div:last-child').textContent = '⬜'; }
+    }
+  });
+  updateBankSelectedCount();
+}
+
+function toggleBankSelect(idx, el) {
+  if (selectedBankIds.has(idx)) {
+    selectedBankIds.delete(idx);
+    el.style.borderColor = 'var(--border)';
+    el.style.background  = '';
+    el.querySelector('div:last-child').textContent = '⬜';
+  } else {
+    selectedBankIds.add(idx);
+    el.style.borderColor = 'var(--primary)';
+    el.style.background  = 'var(--primary-light)';
+    el.querySelector('div:last-child').textContent = '✅';
+  }
+  const allChk = document.getElementById('selectAllBank');
+  if (allChk) allChk.checked = selectedBankIds.size === bankQuestions.length;
+  updateBankSelectedCount();
+}
+
+function updateBankSelectedCount() {
+  const el = document.getElementById('bankSelectedCount');
+  if (el) el.textContent = `${selectedBankIds.size} question${selectedBankIds.size!==1?'s':''} selected`;
+}
+
+function importSelectedQuestions() {
+  if (!selectedTestId)            { showToast('Select a test first', 'warn'); return; }
+  if (selectedBankIds.size === 0) { showToast('Select at least one question', 'warn'); return; }
+  const toImport = [...selectedBankIds].map(i => bankQuestions[i]);
+  toImport.forEach(q => addQuestion(q.type, q));
+  showToast(`${toImport.length} question${toImport.length!==1?'s':''} imported — edit them freely!`, 'success');
+  closeBankModal();
 }

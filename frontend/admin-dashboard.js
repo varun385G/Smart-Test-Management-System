@@ -1,8 +1,8 @@
-const role = localStorage.getItem("role");
+const role = localStorage.getItem("staffRole");
 const staffName = localStorage.getItem("staffName");
 
 if (!role || !staffName) {
-  window.location.href = "/staff";
+  window.location.href = "/staff.html";
 }
 
 document.getElementById("staffName").innerText = "Welcome, " + staffName;

@@ -9,41 +9,39 @@
   <style>
     body { padding-bottom: 80px; }
 
-    /* Exam layout */
-    .exam-layout { display: grid; grid-template-columns: 1fr 220px; gap: 20px; max-width: 1100px; margin: auto; padding: 20px; }
+    /* Layout */
+    .exam-layout { display: grid; grid-template-columns: 1fr 240px; gap: 20px; max-width: 1100px; margin: auto; padding: 20px; }
     @media (max-width: 768px) { .exam-layout { grid-template-columns: 1fr; } #navigatorPanel { order: -1; } }
 
     /* Timer */
     #timerDisplay { font-size: 20px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
-    #timerDisplay.warn { color: var(--warning); }
+    #timerDisplay.warn   { color: var(--warning); }
     #timerDisplay.danger { color: var(--danger); animation: pulse 1s infinite; }
     @keyframes pulse { 50% { opacity: 0.5; } }
 
-    /* Progress */
+    /* Progress bar */
     #progressBar { height: 4px; background: var(--primary); transition: width 0.4s ease; }
 
-    /* Question navigator */
+    /* Navigator grid */
     .nav-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
     .nav-btn {
-      width: 100%; aspect-ratio: 1; border-radius: 7px; border: 1.5px solid var(--border);
+      width: 100%; aspect-ratio: 1; border-radius: 7px;
+      border: 1.5px solid var(--border);
       background: var(--card); font-size: 12px; font-weight: 700; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      transition: all 0.15s; color: var(--text-2); position: relative;
-      font-family: var(--font-main);
+      transition: all 0.15s; color: var(--text-2);
+      font-family: var(--font-main); position: relative;
     }
-    .nav-btn:hover { border-color: var(--primary); color: var(--primary); }
-    .nav-btn.answered { background: var(--primary); border-color: var(--primary); color: white; }
-    .nav-btn.current  { ring: 2px solid var(--primary); box-shadow: 0 0 0 2px var(--primary); }
-    .nav-btn.flagged::after {
-      content: '🚩';
-      position: absolute; top: -4px; right: -4px;
-      font-size: 9px; line-height: 1;
-    }
+    .nav-btn:hover    { border-color: var(--primary); color: var(--primary); }
+    .nav-btn.answered { background: #16a34a; border-color: #16a34a; color: white; }
+    .nav-btn.skipped  { background: #dc2626; border-color: #dc2626; color: white; }
+    .nav-btn.review   { background: #7c3aed; border-color: #7c3aed; color: white; }
+    .nav-btn.current  { box-shadow: 0 0 0 2.5px var(--primary); }
 
-    /* Exam question card */
-    .q-exam-card { background: var(--card); border-radius: var(--radius); border: 1.5px solid var(--border); padding: 24px; margin-bottom: 16px; }
+    /* Question card */
+    .q-exam-card { background: var(--card); border-radius: var(--radius); border: 1.5px solid var(--border); padding: 24px; }
     .q-exam-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; gap: 12px; }
-    .q-exam-num { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .q-exam-num  { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
     .q-exam-text { font-size: 16px; font-weight: 600; line-height: 1.5; color: var(--text); }
 
     .exam-option {
@@ -53,27 +51,136 @@
       cursor: pointer; transition: all 0.15s;
       font-size: 14.5px; color: var(--text-2);
     }
-    .exam-option:hover { border-color: var(--primary); background: var(--primary-light); color: var(--primary-dark); }
+    .exam-option:hover    { border-color: var(--primary); background: var(--primary-light); color: var(--primary-dark); }
     .exam-option.selected { border-color: var(--primary); background: var(--primary-light); color: var(--primary-dark); }
-    .exam-option input { width: 16px; height: 16px; margin: 0; flex-shrink: 0; accent-color: var(--primary); }
+    .exam-option input    { width: 16px; height: 16px; margin: 0; flex-shrink: 0; accent-color: var(--primary); }
 
-    /* Flag button */
-    .flag-btn {
-      padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border);
-      background: transparent; cursor: pointer; font-size: 13px; color: var(--muted);
-      transition: all 0.15s; display: flex; align-items: center; gap: 4px;
-    }
-    .flag-btn.flagged { background: #fff7ed; border-color: var(--warning); color: var(--warning); }
+    /* Action buttons */
+    .exam-actions { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+    .exam-actions .left-btns  { display: flex; gap: 10px; flex-wrap: wrap; }
+    .exam-actions .right-btns { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+    .btn-review    { background: var(--primary); color: white; border: none; padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: var(--font-main); transition: opacity 0.15s; }
+    .btn-review:hover { opacity: 0.88; }
+    .btn-save-next { background: var(--primary); color: white; border: none; padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: var(--font-main); transition: opacity 0.15s; }
+    .btn-save-next:hover { opacity: 0.88; }
+
+    /* Submit lock */
+    #submitBtn.locked { opacity: 0.4; cursor: not-allowed; filter: blur(0.5px); }
+
+    /* Legend */
+    .legend-row { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: var(--text); line-height: 1.4; margin-bottom: 8px; }
+    .legend-dot  { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; margin-top: 1px; }
+
     .badge-red { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
-    #negativeMarkingBanner {
-      background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px;
-      padding: 10px 16px; margin: 0 20px 12px; display: none;
-      font-size: 13px; color: #dc2626; font-weight: 600;
-      display: none; align-items: center; gap: 8px; max-width: 1100px; margin-inline: auto;
+
+    /* Disclaimer screen */
+    #disclaimerScreen {
+      position: fixed; inset: 0; z-index: 9000;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-main);
+      padding: 20px;
+    }
+    .disclaimer-rule {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 12px 14px; border-radius: 10px; margin-bottom: 8px;
+      background: var(--bg); border: 1px solid var(--border);
+      font-size: 13.5px; color: var(--text-2); line-height: 1.5;
+    }
+    .disclaimer-rule .icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+    /* Submit summary */
+    .summary-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; border-radius: 10px; margin-bottom: 8px;
+      font-size: 14px; font-weight: 600;
     }
   </style>
 </head>
 <body>
+
+  <!-- ══════════════════════════════════════════
+       MALPRACTICE DISCLAIMER SCREEN
+       Shown before exam starts
+  ══════════════════════════════════════════ -->
+  <div id="disclaimerScreen">
+    <div style="width:100%; max-width:680px; background:var(--card); border-radius:var(--radius-lg); border:1.5px solid var(--border); overflow:hidden; box-shadow:var(--shadow-lg);">
+
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed); color:white; padding:24px 28px;">
+        <div style="font-size:28px; margin-bottom:8px;">📋</div>
+        <div style="font-size:20px; font-weight:800; margin-bottom:4px;">Exam Instructions & Rules</div>
+        <div style="font-size:13px; opacity:0.88;">Please read carefully before starting your exam</div>
+      </div>
+
+      <!-- Rules -->
+      <div style="padding:24px 28px; max-height:60vh; overflow-y:auto;">
+
+        <div style="font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">What counts as a violation</div>
+
+        <div class="disclaimer-rule">
+          <span class="icon">🔁</span>
+          <div><strong>Tab switching</strong> — Do not switch to another browser tab or window during the exam. Each switch is recorded as a violation.</div>
+        </div>
+        <div class="disclaimer-rule">
+          <span class="icon">🖱️</span>
+          <div><strong>Window focus loss</strong> — Do not click outside the exam window or minimize the browser.</div>
+        </div>
+        <div class="disclaimer-rule">
+          <span class="icon">📋</span>
+          <div><strong>Copy &amp; Paste</strong> — Ctrl+C, Ctrl+V, Ctrl+X and Ctrl+A are blocked. Using them will count as a violation.</div>
+        </div>
+        <div class="disclaimer-rule">
+          <span class="icon">⬅️</span>
+          <div><strong>Back button</strong> — Pressing the browser back button during the exam is recorded as a violation.</div>
+        </div>
+        <div class="disclaimer-rule">
+          <span class="icon">🔧</span>
+          <div><strong>Developer tools</strong> — Opening browser developer tools (F12) is blocked and counts as a violation.</div>
+        </div>
+        <div class="disclaimer-rule">
+          <span class="icon">🔒</span>
+          <div><strong>3 violations = Exam locked</strong> — After 3 violations your exam is locked and an invigilator must unlock it. Your violation log will be visible to staff.</div>
+        </div>
+
+        <div style="height:1px; background:var(--border); margin:16px 0;"></div>
+
+        <div style="font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;">How the exam works</div>
+
+        <div class="disclaimer-rule">
+          <span class="icon">❓</span>
+          <div><strong>One question at a time</strong> — Questions appear one by one. Use <em>Save &amp; Next</em> to move forward and save your answer.</div>
+        </div>
+        <div class="disclaimer-rule">
+          <span class="icon">🟢</span>
+          <div><strong>Green = Answered</strong> — Question has a saved answer.</div>
+        </div>
+        <div class="disclaimer-rule">
+          <span class="icon">🔴</span>
+          <div><strong>Red = Seen but unanswered</strong> — You visited but did not answer.</div>
+        </div>
+        <div class="disclaimer-rule">
+          <span class="icon">🟣</span>
+          <div><strong>Purple = Save &amp; Review</strong> — Answered but marked to revisit.</div>
+        </div>
+        <div class="disclaimer-rule">
+          <span class="icon">💾</span>
+          <div><strong>Auto-save</strong> — Your answers and timer are saved every 10 seconds. Refreshing the page will restore your progress.</div>
+        </div>
+      </div>
+
+      <!-- Confirm button -->
+      <div style="padding:20px 28px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div style="font-size:13px; color:var(--muted); flex:1;">By clicking <strong>I Understand, Start Exam</strong> you confirm that you have read and agree to follow these rules.</div>
+        <button id="startExamBtn" class="btn btn-primary" style="flex-shrink:0;" onclick="startExam()">
+          I Understand, Start Exam →
+        </button>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Top progress bar -->
   <div style="height:4px; background:var(--border); position:sticky; top:0; z-index:200;">
     <div id="progressBar" style="height:4px; background:var(--primary); width:0%; transition:width 0.4s;"></div>
@@ -85,54 +192,108 @@
       <div>
         <div style="font-weight:700; font-size:15px;" id="examTitle">Loading exam…</div>
         <div style="font-size:12px; color:var(--muted);">
-          <span id="answeredCount">0</span> answered · <span id="flaggedCount">0</span> flagged
+          <span id="answeredCount">0</span> answered &nbsp;·&nbsp; <span id="flaggedCount">0</span> review
         </div>
       </div>
     </div>
     <div id="timerDisplay">--:--</div>
   </header>
 
-  <!-- Negative marking warning banner -->
+  <!-- Negative marking warning -->
   <div id="negativeMarkingBanner" style="display:none; background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:10px 16px; margin:12px 20px 0; font-size:13px; color:#dc2626; font-weight:600; align-items:center; gap:8px; max-width:1060px; margin-inline:auto;">
-    ⚠️ This exam has <strong>negative marking</strong> enabled on some questions. Wrong answers will deduct marks. See each question for details.
+    ⚠️ This exam has <strong>negative marking</strong> on some questions. Wrong answers will deduct marks.
   </div>
 
   <div class="exam-layout">
-    <!-- Question area -->
-    <div id="examContainer">
-      <div class="q-exam-card" style="text-align:center; color:var(--muted);">Loading exam…</div>
+
+    <!-- Single question display -->
+    <div>
+      <div id="examContainer">
+        <div class="q-exam-card" style="text-align:center; color:var(--muted);">Loading exam…</div>
+      </div>
     </div>
 
     <!-- Navigator panel -->
     <aside id="navigatorPanel">
       <div class="section-card" style="position:sticky; top:80px; padding:16px;">
+
         <div style="font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Question Map</div>
         <div class="nav-grid" id="navGrid"></div>
-        <div class="divider" style="margin:12px 0;"></div>
-        <div style="font-size:11.5px; color:var(--muted); display:flex; flex-direction:column; gap:5px;">
-          <div style="display:flex; align-items:center; gap:6px;"><div style="width:14px;height:14px;border-radius:4px;background:var(--primary);"></div> Answered</div>
-          <div style="display:flex; align-items:center; gap:6px;"><div style="width:14px;height:14px;border-radius:4px;border:1.5px solid var(--border);"></div> Not answered</div>
-          <div style="display:flex; align-items:center; gap:6px; position:relative;">
-            <div style="width:14px;height:14px;border-radius:4px;border:1.5px solid var(--border); position:relative;">
-              <span style="position:absolute; top:-6px; right:-6px; font-size:9px;">🚩</span>
-            </div> Flagged
-          </div>
+
+        <div style="height:1px; background:var(--border); margin:14px 0;"></div>
+
+        <!-- Submit button -->
+        <button id="submitBtn" class="btn btn-primary" style="width:100%; margin-bottom:8px;" onclick="handleSubmitClick()">Submit Exam</button>
+        <div id="submitLockMsg" style="display:none; font-size:11.5px; color:var(--muted); text-align:center; margin-bottom:12px;"></div>
+
+        <div style="height:1px; background:var(--border); margin-bottom:14px;"></div>
+
+        <!-- Colour legend -->
+        <div style="font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">Status Guide</div>
+        <div class="legend-row">
+          <div class="legend-dot" style="background:white; border:1.5px solid var(--border);"></div>
+          <span><strong>Not Visited</strong> — not opened yet</span>
         </div>
-        <button class="btn btn-primary" style="width:100%; margin-top:14px;" onclick="confirmSubmit()">Submit Exam</button>
+        <div class="legend-row">
+          <div class="legend-dot" style="background:#16a34a;"></div>
+          <span><strong>Answered</strong> — answer saved</span>
+        </div>
+        <div class="legend-row">
+          <div class="legend-dot" style="background:#dc2626;"></div>
+          <span><strong>Not Answered</strong> — visited, no answer</span>
+        </div>
+        <div class="legend-row">
+          <div class="legend-dot" style="background:#7c3aed;"></div>
+          <span><strong>Review</strong> — answered, flagged to revisit</span>
+        </div>
+
       </div>
     </aside>
+
   </div>
 
-  <!-- Submit confirmation -->
+  <!-- ══ SUBMIT CONFIRMATION with full summary ══ -->
   <div class="modal-overlay" id="confirmBox">
-    <div class="modal-box" style="max-width:400px; text-align:center;">
-      <div style="font-size:40px; margin-bottom:12px;">📤</div>
-      <h3 style="margin-bottom:8px;">Submit Exam?</h3>
-      <p style="color:var(--muted); font-size:14px; margin-bottom:8px;">You have answered <strong id="confirmAnswered">0</strong> out of <strong id="confirmTotal">0</strong> questions.</p>
-      <p style="color:var(--danger); font-size:13px; margin-bottom:20px;">⚠ This action cannot be undone.</p>
-      <div style="display:flex; gap:10px; justify-content:center;">
-        <button class="btn" onclick="cancelSubmit()">Go Back</button>
-        <button class="btn btn-primary" onclick="finalSubmit()">Yes, Submit</button>
+    <div class="modal-box" style="max-width:460px;">
+      <div class="modal-header">
+        <span class="modal-title">Submit Exam?</span>
+        <button class="modal-close" onclick="cancelSubmit()">✕</button>
+      </div>
+      <div style="padding:20px;">
+
+        <!-- Summary grid -->
+        <!-- hidden elements for backward compat with confirmSubmit -->
+        <input type="hidden" id="confirmAnswered" value="0">
+        <input type="hidden" id="confirmTotal" value="0">
+      <div id="submitSummary" style="margin-bottom:16px;">
+          <div class="summary-row" style="background:#d1fae5; color:#065f46;">
+            <span>Answered</span>
+            <span id="summaryAnswered" style="font-size:20px;">0</span>
+          </div>
+          <div class="summary-row" style="background:#fee2e2; color:#7f1d1d;">
+            <span>Not Answered</span>
+            <span id="summaryUnanswered" style="font-size:20px;">0</span>
+          </div>
+          <div class="summary-row" style="background:#ede9fe; color:#4c1d95;">
+            <span>Marked for Review</span>
+            <span id="summaryReview" style="font-size:20px;">0</span>
+          </div>
+          <div class="summary-row" style="background:#f1f5f9; color:var(--text-2);">
+            <span>Not Visited</span>
+            <span id="summaryUnvisited" style="font-size:20px;">0</span>
+          </div>
+          <div class="summary-row" style="background:var(--primary-light); color:var(--primary-dark); border:1.5px solid var(--primary); margin-top:4px;">
+            <span>Total Questions</span>
+            <span id="summaryTotal" style="font-size:20px;">0</span>
+          </div>
+        </div>
+
+        <p style="color:var(--danger); font-size:13px; text-align:center; margin-bottom:16px;">⚠ Once submitted, you cannot change your answers.</p>
+
+        <div style="display:flex; gap:10px; justify-content:center;">
+          <button class="btn" onclick="cancelSubmit()">Go Back &amp; Review</button>
+          <button class="btn btn-primary" onclick="finalSubmit()">Yes, Submit Now</button>
+        </div>
       </div>
     </div>
   </div>

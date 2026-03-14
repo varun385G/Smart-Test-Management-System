@@ -3,56 +3,56 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Manage Staff</title>
-
-  <!-- Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-
-  <!-- Styles -->
-  <link rel="stylesheet" href="theme.css">
-  <link rel="stylesheet" href="ui.css">
-  <link rel="stylesheet" href="responsive.css">
+  <title>Manage Staff — STMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
 </head>
+<body>
 
-<body class="modern-ui">
+  <header class="header">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <button class="btn btn-ghost btn-sm" onclick="goBack()">← Back</button>
+      <div style="font-weight:700; font-size:15px;">Manage Staff</div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="location.href='/create-staff.html'">＋ Create Staff</button>
+  </header>
 
-  <!-- PAGE CONTAINER -->
-  <main class="container" style="padding:24px; max-width:900px; margin:auto;">
-
-    <!-- HEADER -->
-    <section class="card" style="margin-bottom:20px;">
-      <h2 style="margin-top:0;">Manage Staff</h2>
-      <p style="color:var(--muted); margin-bottom:0;">
-        View and manage staff accounts
-      </p>
-    </section>
-
-    <!-- TABLE CARD -->
-    <section class="card">
-
+  <main style="max-width:900px; margin:auto; padding:24px 20px;">
+    <div class="section-card">
       <table class="table">
         <thead>
           <tr>
             <th>Name</th>
             <th>Email</th>
-            <th style="width:140px;">Action</th>
+            <th>Role</th>
+            <th style="width:200px;">Actions</th>
           </tr>
         </thead>
-        <tbody id="staffList"></tbody>
+        <tbody id="staffList">
+          <tr><td colspan="4"><div class="skeleton" style="height:16px; margin:6px 0;"></div></td></tr>
+        </tbody>
       </table>
-
-    </section>
-
-    <!-- BACK BUTTON -->
-    <section style="margin-top:16px;">
-      <button class="btn" onclick="goBack()">Back</button>
-    </section>
-
+    </div>
   </main>
 
-  <!-- SCRIPT -->
-  <script src="manage-staff.js"></script>
+  <!-- Reset Password Modal -->
+  <div class="modal-overlay" id="resetPwModal">
+    <div class="modal-box" style="max-width:400px;">
+      <div class="modal-header">
+        <span class="modal-title">🔑 Reset Staff Password</span>
+        <button class="modal-close" onclick="closeResetModal()">✕</button>
+      </div>
+      <p style="font-size:13.5px; color:var(--muted); margin-bottom:16px;">Resetting password for: <strong id="resetStaffName"></strong></p>
+      <div class="form-group">
+        <label class="form-label">New Password *</label>
+        <input id="resetNewPw" type="password" placeholder="Enter new password for this staff">
+      </div>
+      <p id="resetMsg" style="font-size:13px; margin-bottom:10px; min-height:18px;"></p>
+      <button class="btn btn-primary" style="width:100%;" onclick="submitResetPassword()">Set New Password</button>
+    </div>
+  </div>
 
+  <script src="ui.js"></script>
+  <script src="manage-staff.js"></script>
 </body>
 </html>

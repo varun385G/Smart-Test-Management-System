@@ -3,60 +3,45 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Student Dashboard</title>
-
-  <!-- Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-
-  <!-- Styles -->
-  <link rel="stylesheet" href="theme.css">
-  <link rel="stylesheet" href="ui.css">
-  <link rel="stylesheet" href="responsive.css">
+  <title>Student Dashboard — STMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
 </head>
+<body>
 
-<body class="modern-ui">
+  <header class="header">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div style="width:32px;height:32px;background:var(--primary);border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:15px;">S</div>
+      <span style="font-weight:700; font-size:15px;">Student Portal</span>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="location.href='/'">← Home</button>
+  </header>
 
-  <!-- PAGE WRAPPER -->
-  <main class="container" style="padding:24px;">
+  <main style="max-width:520px; margin:auto; padding:24px 20px;">
 
-    <!-- HEADER CARD -->
-    <section class="card" style="margin-bottom:20px;">
-      <h2 style="margin-top:0;">Student Dashboard</h2>
-      <p style="color:var(--muted); margin-bottom:0;">
-        Welcome. Check your test details below.
-      </p>
-    </section>
-
-    <!-- INFO CARD -->
-    <section class="card" style="margin-bottom:20px;">
-
-      <p><strong>Name:</strong> <span id="name"></span></p>
-      <p><strong>Test ID:</strong> <span id="testId"></span></p>
-      <p>
-        <strong>Status:</strong>
-        <span id="status" style="font-weight:600;"></span>
-      </p>
-
-    </section>
-
-    <!-- ACTIONS CARD -->
-    <section class="card">
-      <div style="display:flex; gap:12px; flex-wrap:wrap;">
-        <button id="startBtn" class="btn btn-primary">
-          Start Exam
-        </button>
-
-        <button id="resultBtn" class="btn">
-          View Result
-        </button>
+    <div class="card" style="padding:28px; margin-bottom:16px;">
+      <div style="display:flex; align-items:center; gap:14px; margin-bottom:20px;">
+        <div style="width:48px;height:48px;background:var(--primary-light);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;">🎓</div>
+        <div>
+          <div style="font-weight:700; font-size:16px;" id="name">Student</div>
+          <div style="font-size:13px; color:var(--muted);">Test ID: <strong id="testId">—</strong></div>
+        </div>
       </div>
-    </section>
+
+      <div style="background:var(--bg); border-radius:10px; padding:14px 16px; margin-bottom:20px;">
+        <div style="font-size:12px; color:var(--muted); margin-bottom:4px; text-transform:uppercase; font-weight:700; letter-spacing:0.5px;">Exam Status</div>
+        <div id="status" style="font-size:15px; font-weight:700;"></div>
+      </div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button id="startBtn" class="btn btn-primary" style="flex:1;">Start Exam →</button>
+        <button id="resultBtn" class="btn" style="flex:1;">View Result</button>
+      </div>
+    </div>
 
   </main>
 
-  <!-- SCRIPT -->
+  <script src="ui.js"></script>
   <script src="student-dashboard.js"></script>
-
 </body>
 </html>

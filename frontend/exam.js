@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════
-   EXAM ENGINE — full featured
+   EXAM ENGINE — one question at a time
    ═══════════════════════════════════════════ */
 
 function shuffleArray(arr) {
@@ -12,21 +12,25 @@ function shuffleArray(arr) {
 }
 
 /* ── State ────────────────────────────────── */
-let questions        = [];
-let answers          = [];
-let flagged          = new Set();
-let remainingSeconds = 0;
-let timerInterval    = null;
-let autoSaveInterval = null;
-let examSubmitted    = false;
-let examLocked       = false;
-let violationCount   = 0;
-const MAX_VIOLATIONS = 3;
+let questions           = [];
+let answers             = [];
+let questionStatus      = [];   // 'unvisited' | 'answered' | 'skipped' | 'review'
+let currentIndex        = 0;
+let remainingSeconds    = 0;
+let timerInterval       = null;
+let autoSaveInterval    = null;
+let examSubmitted       = false;
+let examLocked          = false;
+let violationCount      = 0;
+let examReady           = false;
+let examStarted         = false;  // true only after student dismisses disclaimer
+let submitAfterSeconds  = null;   // null = no lock, else seconds from start when submit unlocks
+let elapsedSeconds      = 0;      // how many seconds have passed since exam started
+let elapsedInterval     = null;
+const MAX_VIOLATIONS    = 3;
 
-// Violation dedup: 1.5s cooldown so visibilitychange+blur don't double-count
 let lastViolationTime = 0;
 const VIOLATION_COOLDOWN_MS = 1500;
-
 const violationLog = [];
 
 const testId      = localStorage.getItem('testId');
@@ -53,7 +57,15 @@ window.addEventListener('beforeunload', e => {
   if (!examSubmitted && !examLocked) { e.preventDefault(); e.returnValue = ''; }
 });
 
+// Back button detection
+history.pushState(null, '', location.href);
+window.addEventListener('popstate', () => {
+  history.pushState(null, '', location.href);
+  recordViolation('Back button pressed');
+});
+
 function recordViolation(reason) {
+  if (!examStarted) return;  // don't count violations during disclaimer
   if (examSubmitted || examLocked) return;
   const now = Date.now();
   if (now - lastViolationTime < VIOLATION_COOLDOWN_MS) return;
@@ -79,6 +91,7 @@ async function lockExam() {
   examLocked = true;
   clearInterval(timerInterval);
   clearInterval(autoSaveInterval);
+  clearInterval(elapsedInterval);
 
   document.getElementById('warningBox').classList.remove('open');
   document.getElementById('confirmBox').classList.remove('open');
@@ -137,7 +150,7 @@ async function lockExam() {
   document.body.appendChild(overlay);
 }
 
-/* ── Remap answers: shuffled index → original index ── */
+/* ── Remap answers: shuffled → original index ── */
 function remapAnswers() {
   const totalQ = questions.length;
   const remapped = new Array(totalQ).fill(null);
@@ -156,14 +169,10 @@ function startTimer() {
   timerInterval = setInterval(() => {
     remainingSeconds--;
     updateTimerDisplay();
+    updateSubmitLock();
     if (remainingSeconds <= 0) {
       clearInterval(timerInterval);
-      // If locked → force submit with current answers; else normal submit
-      if (examLocked) {
-        timerExpiredForceSubmit();
-      } else {
-        finalSubmit();
-      }
+      if (examLocked) { timerExpiredForceSubmit(); } else { finalSubmit(); }
     }
   }, 1000);
 }
@@ -177,12 +186,42 @@ function updateTimerDisplay() {
   el.className = remainingSeconds < 60 ? 'danger' : remainingSeconds < 300 ? 'warn' : '';
 }
 
-/* Timer expired while locked → force-submit with existing saved answers */
+/* ── Submit lock logic ────────────────────── */
+let totalDurationSeconds = 0;
+
+function updateSubmitLock() {
+  if (submitAfterSeconds === null) return;
+  const btn = document.getElementById('submitBtn');
+  const msg = document.getElementById('submitLockMsg');
+  if (!btn) return;
+
+  const elapsed = totalDurationSeconds - remainingSeconds;
+  const canSubmit = elapsed >= submitAfterSeconds;
+
+  if (canSubmit) {
+    btn.classList.remove('locked');
+    btn.disabled = false;
+    if (msg) msg.style.display = 'none';
+  } else {
+    btn.classList.add('locked');
+    btn.disabled = true;
+    const minsLeft = Math.ceil((submitAfterSeconds - elapsed) / 60);
+    if (msg) {
+      msg.style.display = 'block';
+      msg.textContent = `🔒 Submit unlocks in ${minsLeft} min${minsLeft !== 1 ? 's' : ''}`;
+    }
+  }
+}
+
+function handleSubmitClick() {
+  const btn = document.getElementById('submitBtn');
+  if (btn && btn.classList.contains('locked')) return;
+  confirmSubmit();
+}
+
 async function timerExpiredForceSubmit() {
   clearInterval(autoSaveInterval);
   try {
-    // The server already has the saved answers from lockExam()
-    // We call submit API which will overwrite with calculated score
     const remapped = remapAnswers();
     await fetch('/api/exam/submit', {
       method: 'POST',
@@ -190,13 +229,12 @@ async function timerExpiredForceSubmit() {
       body: JSON.stringify({ testId, studentName, studentReg, answers: remapped, violationLog })
     });
   } catch (_) {}
-  // Remove lock overlay and show submitted screen
   const overlay = document.getElementById('lockOverlay');
   if (overlay) overlay.remove();
   showSubmittedScreen();
 }
 
-/* ── Auto-save progress every 30 seconds ──── */
+/* ── Auto-save every 10 seconds ──────────── */
 async function autoSaveProgress() {
   if (examSubmitted || examLocked) return;
   try {
@@ -209,28 +247,320 @@ async function autoSaveProgress() {
   } catch (_) {}
 }
 
+/* ── Immediate save on each answer action ─── */
+function saveNow() {
+  if (examSubmitted || examLocked) return;
+  autoSaveProgress();
+}
+
+/* ══════════════════════════════════════════
+   RENDER SINGLE QUESTION
+══════════════════════════════════════════ */
+function renderQuestion(qi) {
+  currentIndex = qi;
+  // Save current position so refresh can restore it
+  if (testId) localStorage.setItem('currentIndex_' + testId, qi);
+  const q = questions[qi];
+  const container = document.getElementById('examContainer');
+
+  // Mark as skipped if unvisited (visiting now for first time without answer)
+  if (questionStatus[qi] === 'unvisited') {
+    questionStatus[qi] = 'skipped';
+  }
+  updateAllNavBtns();
+
+  const marks = q.marks || 1;
+  const typeLabel = q.type === 'MCQ' ? 'Single correct' : q.type === 'MSQ' ? 'Multiple correct' : 'Numeric answer';
+  const typeBadgeClass = q.type === 'MCQ' ? 'badge-blue' : q.type === 'MSQ' ? 'badge-purple' : 'badge-orange';
+
+  let negBadge = '';
+  if (q.negativeMarkingEnabled && q.negativeMarks > 0) {
+    negBadge = `<span class="badge badge-red" style="font-size:11px;">−${q.negativeMarks} for wrong</span>`;
+  }
+
+  let msqHint = '';
+  if (q.type === 'MSQ') {
+    msqHint = `<div style="background:#f5f3ff; border:1px solid #c4b5fd; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:12.5px; color:#5b21b6;">
+      Select all correct answers. Partial marks awarded. Wrong selections reduce your score.
+    </div>`;
+  }
+
+  let html = `
+    <div class="q-exam-card">
+      <div class="q-exam-header">
+        <div>
+          <div class="q-exam-num">Question ${qi + 1} of ${questions.length}</div>
+          <div style="display:flex; gap:8px; margin-top:4px; flex-wrap:wrap;">
+            <span class="badge ${typeBadgeClass}">${typeLabel}</span>
+            <span class="badge badge-gray">${marks} mark${marks !== 1 ? 's' : ''}</span>
+            ${negBadge}
+          </div>
+        </div>
+      </div>
+      <div class="q-exam-text" style="margin-bottom:16px;">${q.question}</div>
+      ${msqHint}
+  `;
+
+  if (q.image) {
+    html += `<img src="${q.image}" style="max-width:100%; max-height:280px; border-radius:10px; margin-bottom:16px; display:block;">`;
+  }
+
+  if (q.type === 'MCQ' || q.type === 'MSQ') {
+    const opts = q._shuffledOpts || q.options.map((o, i) => ({ o, i }));
+    opts.forEach(({ o, i }) => {
+      const inputType = q.type === 'MCQ' ? 'radio' : 'checkbox';
+      const isSelected = q.type === 'MCQ'
+        ? answers[qi] === i
+        : Array.isArray(answers[qi]) && answers[qi].includes(i);
+      html += `
+        <label class="exam-option${isSelected ? ' selected' : ''}" id="opt-${qi}-${i}">
+          <input type="${inputType}" name="q${qi}" data-qi="${qi}" data-idx="${i}"
+                 ${isSelected ? 'checked' : ''}
+                 onchange="handleAnswer(${qi}, ${i}, this)">
+          <span>${o}</span>
+        </label>
+      `;
+    });
+  }
+
+  if (q.type === 'NAT') {
+    const savedVal = (answers[qi] !== null && answers[qi] !== undefined) ? answers[qi] : '';
+    html += `
+      <input type="number" step="any" placeholder="Enter your numeric answer"
+             data-qi="${qi}" id="natInput-${qi}"
+             value="${savedVal}"
+             oninput="handleNAT(${qi}, this)"
+             style="max-width:240px; font-size:16px; font-weight:700;">
+    `;
+  }
+
+  const isFirst = qi === 0;
+  const isLast  = qi === questions.length - 1;
+
+  html += `
+    <div class="exam-actions">
+      <div class="left-btns">
+        <button class="btn btn-sm" onclick="goToPrev()" ${isFirst ? 'disabled' : ''}>← Previous</button>
+        <button class="btn-review" onclick="saveAndReview(${qi})">Save &amp; Review</button>
+      </div>
+      <div class="right-btns">
+        <button class="btn btn-sm" onclick="clearAnswer(${qi})">Clear</button>
+        ${isLast
+          ? `<button class="btn-save-next" onclick="saveAndNext(${qi})">Save</button>`
+          : `<button class="btn-save-next" onclick="saveAndNext(${qi})">Save &amp; Next →</button>`
+        }
+      </div>
+    </div>
+  `;
+
+  html += `</div>`;
+  container.innerHTML = html;
+
+  updateAllNavBtns();
+}
+
+/* ── Answer handlers ──────────────────────── */
+function handleAnswer(qi, idx, input) {
+  const q = questions[qi];
+  if (q.type === 'MCQ') {
+    answers[qi] = idx;
+    document.querySelectorAll(`[data-qi="${qi}"]`).forEach(inp => {
+      inp.closest('.exam-option').classList.toggle('selected', inp.checked);
+    });
+  }
+  if (q.type === 'MSQ') {
+    if (!Array.isArray(answers[qi])) answers[qi] = [];
+    if (input.checked) { if (!answers[qi].includes(idx)) answers[qi].push(idx); }
+    else answers[qi] = answers[qi].filter(x => x !== idx);
+    input.closest('.exam-option').classList.toggle('selected', input.checked);
+  }
+  // Save immediately on every answer change
+  saveNow();
+}
+
+function handleNAT(qi, input) {
+  answers[qi] = input.value !== '' ? Number(input.value) : null;
+  saveNow();
+}
+
+/* ── Save & Next ──────────────────────────── */
+function saveAndNext(qi) {
+  const hasAnswer = isAnswered(qi);
+  if (hasAnswer) {
+    if (questionStatus[qi] !== 'review') questionStatus[qi] = 'answered';
+  } else {
+    questionStatus[qi] = 'skipped';
+  }
+  updateAllNavBtns();
+  updateProgress();
+  saveNow();
+
+  if (qi < questions.length - 1) {
+    renderQuestion(qi + 1);
+  } else {
+    handleSubmitClick();
+  }
+}
+
+/* ── Save & Review ────────────────────────── */
+function saveAndReview(qi) {
+  if (!isAnswered(qi)) {
+    alert('Please answer the question first, then click Save & Review.');
+    return;
+  }
+  questionStatus[qi] = 'review';
+  updateAllNavBtns();
+  updateProgress();
+  saveNow();
+  if (qi < questions.length - 1) {
+    renderQuestion(qi + 1);
+  }
+}
+
+/* ── Clear answer ─────────────────────────── */
+function clearAnswer(qi) {
+  const q = questions[qi];
+  answers[qi] = q.type === 'MSQ' ? [] : null;
+  questionStatus[qi] = 'skipped';
+  updateAllNavBtns();
+  updateProgress();
+  saveNow();
+  renderQuestion(qi);
+}
+
+/* ── Prev / Nav ───────────────────────────── */
+function goToPrev() {
+  if (currentIndex > 0) renderQuestion(currentIndex - 1);
+}
+
+function goToQuestion(qi) {
+  renderQuestion(qi);
+}
+
+/* ── Check if answered ────────────────────── */
+function isAnswered(qi) {
+  const ans = answers[qi];
+  if (Array.isArray(ans)) return ans.length > 0;
+  return ans !== null && ans !== undefined && ans !== '';
+}
+
+/* ── Navigator ────────────────────────────── */
+function buildNavigator() {
+  const grid = document.getElementById('navGrid');
+  grid.innerHTML = questions.map((_, i) => `
+    <button class="nav-btn" id="navBtn-${i}" onclick="goToQuestion(${i})">${i + 1}</button>
+  `).join('');
+}
+
+function updateAllNavBtns() {
+  questions.forEach((_, i) => {
+    const btn = document.getElementById(`navBtn-${i}`);
+    if (!btn) return;
+    btn.classList.remove('answered', 'skipped', 'review', 'current');
+    const status = questionStatus[i];
+    if (status === 'answered') btn.classList.add('answered');
+    else if (status === 'skipped') btn.classList.add('skipped');
+    else if (status === 'review')  btn.classList.add('review');
+    if (i === currentIndex) btn.classList.add('current');
+  });
+}
+
+/* ── Progress ─────────────────────────────── */
+function updateProgress() {
+  const answered = questionStatus.filter(s => s === 'answered' || s === 'review').length;
+  const pct = questions.length ? (answered / questions.length * 100) : 0;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('answeredCount').textContent = answered;
+  const reviewCount = questionStatus.filter(s => s === 'review').length;
+  document.getElementById('flaggedCount').textContent = reviewCount;
+  const confirmAnswered = document.getElementById('confirmAnswered');
+  if (confirmAnswered) confirmAnswered.textContent = answered;
+}
+
+/* ── Submit ───────────────────────────────── */
+function confirmSubmit() {
+  // Populate summary
+  const answered   = questionStatus.filter(s => s === 'answered').length;
+  const review     = questionStatus.filter(s => s === 'review').length;
+  const skipped    = questionStatus.filter(s => s === 'skipped').length;
+  const unvisited  = questionStatus.filter(s => s === 'unvisited').length;
+  const total      = questions.length;
+
+  const sa = document.getElementById('summaryAnswered');
+  const sr = document.getElementById('summaryReview');
+  const su = document.getElementById('summaryUnanswered');
+  const suv = document.getElementById('summaryUnvisited');
+  const st = document.getElementById('summaryTotal');
+
+  if (sa)  sa.textContent  = answered;
+  if (sr)  sr.textContent  = review;
+  if (su)  su.textContent  = skipped;
+  if (suv) suv.textContent = unvisited;
+  if (st)  st.textContent  = total;
+
+  // Also update old confirmAnswered/confirmTotal if they exist
+  const ca = document.getElementById('confirmAnswered');
+  const ct = document.getElementById('confirmTotal');
+  if (ca) ca.textContent = answered + review;
+  if (ct) ct.textContent = total;
+
+  document.getElementById('confirmBox').classList.add('open');
+}
+function cancelSubmit()  { document.getElementById('confirmBox').classList.remove('open'); }
+
+async function finalSubmit() {
+  if (examSubmitted || examLocked) return;
+  examSubmitted = true;
+  clearInterval(timerInterval);
+  clearInterval(autoSaveInterval);
+  clearInterval(elapsedInterval);
+
+  // Clear disclaimer + position flags so next student on same device starts fresh
+  localStorage.removeItem('disclaimerSeen_' + testId);
+  localStorage.removeItem('currentIndex_' + testId);
+
+  document.getElementById('confirmBox').classList.remove('open');
+
+  const remapped = remapAnswers();
+
+  try {
+    await fetch('/api/exam/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ testId, studentName, studentReg, answers: remapped, violationLog })
+    });
+  } catch (_) {}
+
+  showSubmittedScreen();
+}
+
+function showSubmittedScreen() {
+  examSubmitted = true;
+  document.body.innerHTML = `
+    <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); font-family:var(--font-main);">
+      <div class="card" style="max-width:400px; width:90%; text-align:center; padding:40px;">
+        <div style="font-size:56px; margin-bottom:16px;">✅</div>
+        <h2 style="font-size:22px; margin-bottom:8px;">Exam Submitted!</h2>
+        <p style="color:var(--muted); font-size:14px; margin-bottom:24px;">
+          Your answers have been recorded.<br>Results will be available once published by your staff.
+        </p>
+        <button onclick="location.href='/'" class="btn btn-primary" style="width:100%;">Return to Home</button>
+      </div>
+    </div>
+  `;
+}
+
 /* ── Load Exam ────────────────────────────── */
 async function loadExam() {
-  // Check lock / submit status first (handles page refresh scenarios)
   let lockData = null;
   try {
     const lockRes = await fetch(`/api/exam/lock-status/${testId}/${studentReg}`);
     if (lockRes.ok) lockData = await lockRes.json();
   } catch (_) {}
 
-  // 1. Force-submitted by staff → show submitted screen, stop here
-  if (lockData && lockData.isForceSubmitted) {
-    showSubmittedScreen();
-    return;
-  }
+  if (lockData && lockData.isForceSubmitted) { showSubmittedScreen(); return; }
+  if (lockData && lockData.isLocked) { renderLockScreenOnly(lockData.lockCode); return; }
 
-  // 2. Still locked → show lock screen, stop here
-  if (lockData && lockData.isLocked) {
-    renderLockScreenOnly(lockData.lockCode);
-    return;
-  }
-
-  // Load test data
   let test;
   try {
     const res = await fetch(`/api/tests/${testId}`);
@@ -248,43 +578,54 @@ async function loadExam() {
   const originalQuestions = test.questions || [];
   questions = test.shuffleQuestions !== false ? shuffleArray([...originalQuestions]) : [...originalQuestions];
 
-  // Tag each question with its original index for answer remapping
   questions.forEach(q => {
-    q._origIdx = originalQuestions.findIndex(orig =>
-      orig.question === q.question && orig.type === q.type
-    );
+    q._origIdx = originalQuestions.findIndex(orig => orig.question === q.question && orig.type === q.type);
+    // Pre-shuffle options once so they stay consistent while navigating back and forth
+    if ((q.type === 'MCQ' || q.type === 'MSQ') && test.shuffleOptions !== false) {
+      q._shuffledOpts = shuffleArray(q.options.map((o, i) => ({ o, i })));
+    } else {
+      q._shuffledOpts = q.options ? q.options.map((o, i) => ({ o, i })) : [];
+    }
   });
 
-  // Default blank answers
-  answers = questions.map(q => q.type === 'MSQ' ? [] : null);
+  // Submit lock setup
+  totalDurationSeconds = (test.duration || 30) * 60;
+  if (test.submitAfterMinutes) {
+    submitAfterSeconds = test.submitAfterMinutes * 60;
+  } else {
+    submitAfterSeconds = null;
+  }
 
-  // 3. Restore saved answers + remaining timer if student previously started (unlock resume or crash recovery)
+  // Default blank answers and statuses
+  answers        = questions.map(q => q.type === 'MSQ' ? [] : null);
+  questionStatus = questions.map(() => 'unvisited');
+
+  // ── Restore saved answers and timer from server (survives refresh) ──
   if (lockData && lockData.exists && lockData.savedAnswers && lockData.savedAnswers.length > 0) {
     questions.forEach((q, shuffledIdx) => {
       const origIdx = q._origIdx !== undefined ? q._origIdx : shuffledIdx;
       const saved = lockData.savedAnswers[origIdx];
       if (saved !== undefined && saved !== null) {
-        if (q.type === 'MSQ') {
-          answers[shuffledIdx] = Array.isArray(saved) ? [...saved] : [];
-        } else {
-          answers[shuffledIdx] = saved;
-        }
+        answers[shuffledIdx] = q.type === 'MSQ'
+          ? (Array.isArray(saved) ? [...saved] : [])
+          : saved;
+        if (isAnswered(shuffledIdx)) questionStatus[shuffledIdx] = 'answered';
       }
     });
   }
 
-  // 4. Restore remaining timer — if saved use it, otherwise start fresh
-  const fullDuration = (test.duration || 30) * 60;
-  if (lockData && lockData.remainingSeconds !== null && lockData.remainingSeconds !== undefined && lockData.remainingSeconds > 0) {
+  // ── Restore remaining timer from server ──
+  // If server has a saved remainingSeconds use it, else start fresh
+  if (lockData && lockData.remainingSeconds != null && lockData.remainingSeconds > 0) {
     remainingSeconds = lockData.remainingSeconds;
   } else {
-    remainingSeconds = fullDuration;
+    remainingSeconds = totalDurationSeconds;
   }
 
   startTimer();
 
-  // Start periodic auto-save every 30 seconds
-  autoSaveInterval = setInterval(autoSaveProgress, 30000);
+  // Auto-save every 10 seconds (more frequent = better refresh recovery)
+  autoSaveInterval = setInterval(autoSaveProgress, 10000);
 
   document.getElementById('confirmTotal').textContent = questions.length;
 
@@ -294,13 +635,14 @@ async function loadExam() {
     if (banner) banner.style.display = 'flex';
   }
 
-  renderAllQuestions(test);
-  restoreAnswersInUI();
   buildNavigator();
   updateProgress();
+  updateSubmitLock();
+  // Don't render the first question yet — wait for student to dismiss disclaimer
+  examReady = true;
 }
 
-/* Render lock screen only (on page refresh while locked) */
+/* ── Lock screen on refresh ───────────────── */
 function renderLockScreenOnly(lockCode) {
   examLocked = true;
   clearInterval(timerInterval);
@@ -336,214 +678,44 @@ function renderLockScreenOnly(lockCode) {
   document.body.appendChild(overlay);
 }
 
-/* ── Render questions ─────────────────────── */
-function renderAllQuestions(test) {
-  const container = document.getElementById('examContainer');
-  container.innerHTML = '';
-
-  questions.forEach((q, qi) => {
-    const card = document.createElement('div');
-    card.className = 'q-exam-card';
-    card.id = `qcard-${qi}`;
-
-    const marks = q.marks || 1;
-    const typeLabel = q.type === 'MCQ' ? 'Single correct' : q.type === 'MSQ' ? 'Multiple correct' : 'Numeric answer';
-    const typeBadgeClass = q.type === 'MCQ' ? 'badge-blue' : q.type === 'MSQ' ? 'badge-purple' : 'badge-orange';
-
-    let negBadge = '';
-    if (q.negativeMarkingEnabled && q.negativeMarks > 0) {
-      negBadge = `<span class="badge badge-red" style="font-size:11px;">−${q.negativeMarks} for wrong</span>`;
-    }
-
-    let msqHint = '';
-    if (q.type === 'MSQ') {
-      msqHint = `<div style="background:#f5f3ff; border:1px solid #c4b5fd; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:12.5px; color:#5b21b6;">
-        💡 <strong>Select all correct answers.</strong> Partial marks awarded. Wrong selections reduce your score.
-      </div>`;
-    }
-
-    let html = `
-      <div class="q-exam-header">
-        <div>
-          <div class="q-exam-num">Question ${qi + 1} of ${questions.length}</div>
-          <div style="display:flex; gap:8px; margin-top:4px; flex-wrap:wrap;">
-            <span class="badge ${typeBadgeClass}">${typeLabel}</span>
-            <span class="badge badge-gray">${marks} mark${marks !== 1 ? 's' : ''}</span>
-            ${negBadge}
-          </div>
-        </div>
-        <button class="flag-btn" id="flagBtn-${qi}" onclick="toggleFlag(${qi})">🚩 Flag</button>
-      </div>
-      <div class="q-exam-text" style="margin-bottom:12px;">${q.question}</div>
-      ${msqHint}
-    `;
-
-    if (q.image) {
-      html += `<img src="${q.image}" style="max-width:100%; max-height:280px; border-radius:10px; margin-bottom:16px; display:block;">`;
-    }
-
-    if (q.type === 'MCQ' || q.type === 'MSQ') {
-      const opts = test.shuffleOptions !== false
-        ? shuffleArray(q.options.map((o, i) => ({ o, i })))
-        : q.options.map((o, i) => ({ o, i }));
-
-      opts.forEach(({ o, i }) => {
-        const inputType = q.type === 'MCQ' ? 'radio' : 'checkbox';
-        html += `
-          <label class="exam-option" id="opt-${qi}-${i}">
-            <input type="${inputType}" name="q${qi}" data-qi="${qi}" data-idx="${i}"
-                   onchange="handleAnswer(${qi}, ${i}, this)">
-            <span>${o}</span>
-          </label>
-        `;
-      });
-    }
-
-    if (q.type === 'NAT') {
-      html += `
-        <input type="number" step="any" placeholder="Enter your numeric answer"
-               data-qi="${qi}" oninput="handleNAT(${qi}, this)"
-               style="max-width:240px; font-size:16px; font-weight:700;">
-      `;
-    }
-
-    card.innerHTML = html;
-    container.appendChild(card);
-  });
-}
-
-/* ── Restore saved answers into UI after render ── */
-function restoreAnswersInUI() {
-  questions.forEach((q, qi) => {
-    const saved = answers[qi];
-    if (saved === null || saved === undefined) return;
-
-    if (q.type === 'MCQ') {
-      document.querySelectorAll(`[data-qi="${qi}"]`).forEach(inp => {
-        if (Number(inp.dataset.idx) === saved) {
-          inp.checked = true;
-          inp.closest('.exam-option').classList.add('selected');
-        }
-      });
-    } else if (q.type === 'MSQ') {
-      if (!Array.isArray(saved)) return;
-      document.querySelectorAll(`[data-qi="${qi}"]`).forEach(inp => {
-        if (saved.includes(Number(inp.dataset.idx))) {
-          inp.checked = true;
-          inp.closest('.exam-option').classList.add('selected');
-        }
-      });
-    } else if (q.type === 'NAT') {
-      const input = document.querySelector(`input[type="number"][data-qi="${qi}"]`);
-      if (input && saved !== null && saved !== undefined && saved !== '') {
-        input.value = saved;
+/* ── Disclaimer screen ─────────────────── */
+function startExam() {
+  examStarted = true;  // now violations start counting
+  // Mark disclaimer as seen for this exam session
+  localStorage.setItem('disclaimerSeen_' + testId, '1');
+  const screen = document.getElementById('disclaimerScreen');
+  if (screen) screen.style.display = 'none';
+  // If exam data is ready, render first question now
+  if (examReady) {
+    renderQuestion(0);
+  } else {
+    // Data still loading — poll until ready
+    const wait = setInterval(() => {
+      if (examReady) {
+        clearInterval(wait);
+        renderQuestion(0);
       }
-    }
-    updateNavigatorBtn(qi);
-  });
-}
-
-/* ── Answer handling ──────────────────────── */
-function handleAnswer(qi, idx, input) {
-  const q = questions[qi];
-  if (q.type === 'MCQ') {
-    answers[qi] = idx;
-    document.querySelectorAll(`[data-qi="${qi}"]`).forEach(inp => {
-      inp.closest('.exam-option').classList.toggle('selected', inp.checked);
-    });
+    }, 100);
   }
-  if (q.type === 'MSQ') {
-    if (!Array.isArray(answers[qi])) answers[qi] = [];
-    if (input.checked) { if (!answers[qi].includes(idx)) answers[qi].push(idx); }
-    else answers[qi] = answers[qi].filter(x => x !== idx);
-    input.closest('.exam-option').classList.toggle('selected', input.checked);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const alreadySeen = localStorage.getItem('disclaimerSeen_' + testId);
+  if (alreadySeen) {
+    // Hide disclaimer immediately
+    const screen = document.getElementById('disclaimerScreen');
+    if (screen) screen.style.display = 'none';
+    examStarted = true;
+    // Wait for loadExam to finish, then render the question
+    const wait = setInterval(() => {
+      if (examReady) {
+        clearInterval(wait);
+        // Restore last visited question index if saved
+        const savedIdx = parseInt(localStorage.getItem('currentIndex_' + testId) || '0', 10);
+        const qi = (savedIdx >= 0 && savedIdx < questions.length) ? savedIdx : 0;
+        renderQuestion(qi);
+      }
+    }, 100);
   }
-  updateNavigatorBtn(qi);
-  updateProgress();
-}
-
-function handleNAT(qi, input) {
-  answers[qi] = input.value !== '' ? Number(input.value) : null;
-  updateNavigatorBtn(qi);
-  updateProgress();
-}
-
-/* ── Navigator ────────────────────────────── */
-function buildNavigator() {
-  const grid = document.getElementById('navGrid');
-  grid.innerHTML = questions.map((_, i) => `
-    <button class="nav-btn" id="navBtn-${i}" onclick="scrollToQ(${i})">${i + 1}</button>
-  `).join('');
-}
-
-function updateNavigatorBtn(qi) {
-  const btn = document.getElementById(`navBtn-${qi}`);
-  if (!btn) return;
-  const isAnswered = Array.isArray(answers[qi]) ? answers[qi].length > 0 : answers[qi] !== null;
-  btn.classList.toggle('answered', isAnswered);
-  btn.classList.toggle('flagged', flagged.has(qi));
-}
-
-function scrollToQ(qi) {
-  const card = document.getElementById(`qcard-${qi}`);
-  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function toggleFlag(qi) {
-  flagged.has(qi) ? flagged.delete(qi) : flagged.add(qi);
-  const btn = document.getElementById(`flagBtn-${qi}`);
-  if (btn) btn.classList.toggle('flagged', flagged.has(qi));
-  updateNavigatorBtn(qi);
-  document.getElementById('flaggedCount').textContent = flagged.size;
-}
-
-function updateProgress() {
-  const answered = answers.filter(a => Array.isArray(a) ? a.length > 0 : a !== null).length;
-  const pct = questions.length ? (answered / questions.length * 100) : 0;
-  document.getElementById('progressBar').style.width = pct + '%';
-  document.getElementById('answeredCount').textContent = answered;
-  document.getElementById('confirmAnswered').textContent = answered;
-}
-
-/* ── Submit ───────────────────────────────── */
-function confirmSubmit() { document.getElementById('confirmBox').classList.add('open'); }
-function cancelSubmit()  { document.getElementById('confirmBox').classList.remove('open'); }
-
-async function finalSubmit() {
-  if (examSubmitted || examLocked) return;
-  examSubmitted = true;
-  clearInterval(timerInterval);
-  clearInterval(autoSaveInterval);
-
-  document.getElementById('confirmBox').classList.remove('open');
-
-  const remapped = remapAnswers();
-
-  try {
-    await fetch('/api/exam/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ testId, studentName, studentReg, answers: remapped, violationLog })
-    });
-  } catch (_) {}
-
-  showSubmittedScreen();
-}
-
-function showSubmittedScreen() {
-  examSubmitted = true;
-  document.body.innerHTML = `
-    <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); font-family:var(--font-main);">
-      <div class="card" style="max-width:400px; width:90%; text-align:center; padding:40px;">
-        <div style="font-size:56px; margin-bottom:16px;">✅</div>
-        <h2 style="font-size:22px; margin-bottom:8px;">Exam Submitted!</h2>
-        <p style="color:var(--muted); font-size:14px; margin-bottom:24px;">
-          Your answers have been recorded.<br>Results will be available once published by your staff.
-        </p>
-        <button onclick="location.href='/'" class="btn btn-primary" style="width:100%;">Return to Home</button>
-      </div>
-    </div>
-  `;
-}
-
-document.addEventListener('DOMContentLoaded', loadExam);
+  loadExam();
+});

@@ -13,6 +13,9 @@ const testSchema = new mongoose.Schema(
     scheduledStart: { type: Date, default: null },
     scheduledEnd:   { type: Date, default: null },
 
+    // Minimum minutes before student can submit (optional)
+    submitAfterMinutes: { type: Number, default: null },
+
     questions: [
       {
         type: { type: String, enum: ["MCQ", "MSQ", "NAT"], default: "MCQ" },
