@@ -30,8 +30,7 @@ async function handleSubmit() {
 
     if (!res.ok) {
       if (res.status === 403 && data.scheduledStart) {
-        const startTime = new Date(data.scheduledStart).toLocaleString();
-        msgBox.innerHTML = `<div class="card" style="text-align:center; padding:20px; border-color:var(--warning);"><div style="font-size:36px; margin-bottom:8px;">⏰</div><div style="font-weight:700; margin-bottom:6px;">Exam Not Started Yet</div><div style="color:var(--muted); font-size:13.5px;">This exam is scheduled to start on<br><strong>${startTime}</strong></div></div>`;
+        showNotStartedCountdown(data.scheduledStart);
         return;
       }
       if (res.status === 403 && data.scheduledEnd) {
@@ -125,10 +124,27 @@ async function handleSubmit() {
       return;
     }
 
-    // ── Fresh attempt — go to exam ────────────────────────────────
+    // ── Fresh attempt ────────────────────────────────────────────
+    // Store in BOTH sessionStorage (tab-isolated, primary) and localStorage (fallback for refresh)
+    sessionStorage.setItem('testId', testId);
+    sessionStorage.setItem('studentName', name);
+    sessionStorage.setItem('studentReg', reg);
     localStorage.setItem('testId', testId);
     localStorage.setItem('studentName', name);
     localStorage.setItem('studentReg', reg);
+
+    // If scheduledStart is still more than 2 mins away — show countdown on login page
+    // Auto-redirect happens when 2-min mark is reached (disclaimer shows those 2 mins)
+    if (data.scheduledStart) {
+      const minsLeft = (new Date(data.scheduledStart) - new Date()) / 60000;
+      if (minsLeft > 0) {
+        // Any future time — show countdown (auto-redirects at 2-min mark)
+        showNotStartedCountdown(data.scheduledStart);
+        return;
+      }
+    }
+
+    localStorage.removeItem('examScheduledStart');
     location.href = '/exam.html';
 
   } catch (err) {
@@ -145,3 +161,211 @@ function viewResult(testId, reg) {
 
 // Allow Enter key
 document.addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
+/* ── Not-started countdown (shown when > 7 mins away) ── */
+
+/* ── Pre-exam countdown on login page (credentials verified, waiting for start time) ── */
+let _preExamInterval = null;
+
+function showPreExamCountdown(scheduledStart) {
+  clearInterval(_preExamInterval);
+  const btn = document.getElementById('submitBtn');
+  const pad = n => String(n).padStart(2, '0');
+  if (btn) { btn.disabled = true; btn.textContent = 'Waiting for exam…'; }
+
+  const startStr = new Date(scheduledStart).toLocaleString('en-IN', {
+    weekday:'short', day:'2-digit', month:'short',
+    hour:'2-digit', minute:'2-digit', hour12:true
+  });
+
+  function tick() {
+    const diff = new Date(scheduledStart) - new Date();
+
+    if (diff <= 0) {
+      // Time is up — redirect to exam page now
+      clearInterval(_preExamInterval);
+      msgBoxEl().innerHTML = `
+        <div class="card" style="text-align:center; padding:20px; border-color:var(--success); border-width:2px;">
+          <div style="font-size:32px; margin-bottom:8px;">🚀</div>
+          <div style="font-weight:800; font-size:15px; color:var(--success); margin-bottom:4px;">Exam has started!</div>
+          <div style="color:var(--muted); font-size:13px;">Taking you to the exam now…</div>
+        </div>`;
+      setTimeout(() => { location.href = '/exam.html'; }, 1200);
+      return;
+    }
+
+    const totalSecs = Math.floor(diff / 1000);
+    const hh = Math.floor(totalSecs / 3600);
+    const mm = Math.floor((totalSecs % 3600) / 60);
+    const ss = totalSecs % 60;
+
+    // Update only numbers if already rendered
+    const phaseEl = document.getElementById('_prePhase');
+    if (phaseEl) {
+      const hhEl = document.getElementById('_preHH');
+      const mmEl = document.getElementById('_preMM');
+      const ssEl = document.getElementById('_preSS');
+      if (hhEl) hhEl.textContent = pad(hh);
+      if (mmEl) mmEl.textContent = pad(mm);
+      if (ssEl) ssEl.textContent = pad(ss);
+      return;
+    }
+
+    // First render
+    const hoursBlock = hh > 0 ? `
+      <div style="background:var(--bg); border:1.5px solid var(--border); border-radius:10px; padding:10px 16px; min-width:60px; text-align:center;">
+        <div style="font-size:26px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1;" id="_preHH">${pad(hh)}</div>
+        <div style="font-size:9px; color:var(--muted); text-transform:uppercase; margin-top:2px;">Hrs</div>
+      </div>
+      <div style="font-size:22px; font-weight:900; color:var(--muted); padding-top:6px;">:</div>` : '';
+
+    msgBoxEl().innerHTML = `
+      <div class="card" style="padding:24px; text-align:center; border-color:#4f46e5; border-width:2px;">
+
+        <div style="display:inline-flex; align-items:center; gap:8px; background:#ede9fe; border-radius:20px; padding:6px 14px; margin-bottom:14px;">
+          <span style="font-size:16px;">✅</span>
+          <span style="font-size:13px; font-weight:700; color:#4f46e5;">Credentials Verified</span>
+        </div>
+
+        <div style="font-weight:800; font-size:16px; margin-bottom:4px;">Exam Starts In</div>
+        <div style="color:var(--muted); font-size:12.5px; margin-bottom:18px;">
+          Scheduled: <strong>${startStr}</strong>
+        </div>
+
+        <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-bottom:16px;">
+          ${hoursBlock}
+          <div style="background:var(--bg); border:1.5px solid var(--border); border-radius:10px; padding:10px 16px; min-width:60px; text-align:center;">
+            <div style="font-size:26px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1;" id="_preMM">${pad(mm)}</div>
+            <div style="font-size:9px; color:var(--muted); text-transform:uppercase; margin-top:2px;">Min</div>
+          </div>
+          <div style="font-size:22px; font-weight:900; color:var(--muted); padding-top:6px;">:</div>
+          <div style="background:var(--bg); border:1.5px solid var(--border); border-radius:10px; padding:10px 16px; min-width:60px; text-align:center;">
+            <div style="font-size:26px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1;" id="_preSS">${pad(ss)}</div>
+            <div style="font-size:9px; color:var(--muted); text-transform:uppercase; margin-top:2px;">Sec</div>
+          </div>
+        </div>
+
+        <div id="_prePhase" style="font-size:12px; color:var(--muted); line-height:1.6;">
+          You will be automatically taken to the exam when the timer reaches zero.<br>
+          Please keep this tab open and stay on this page.
+        </div>
+      </div>`;
+  }
+
+  tick();
+  _preExamInterval = setInterval(tick, 1000);
+}
+
+let _notStartedInterval = null;
+
+function showNotStartedCountdown(scheduledStart) {
+  clearInterval(_notStartedInterval);
+  const btn = document.getElementById('submitBtn');
+  const pad = n => String(n).padStart(2, '0');
+
+  // Unlock = 2 mins before exam start (disclaimer shows for those 2 mins)
+  const UNLOCK_MINS = 2;
+  const unlockTime = new Date(new Date(scheduledStart) - UNLOCK_MINS * 60000);
+  const startStr   = new Date(scheduledStart).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:true });
+  const unlockStr  = unlockTime.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:true });
+
+  // Disable button — student should NOT click, auto-redirect will happen
+  if (btn) { btn.disabled = true; btn.textContent = 'Waiting…'; }
+
+  function tick() {
+    const now           = new Date();
+    const diffToUnlock  = unlockTime - now;
+    const diffToStart   = new Date(scheduledStart) - now;
+
+    if (diffToStart <= 0) {
+      // Exam already started — redirect now
+      clearInterval(_notStartedInterval);
+      localStorage.setItem('examScheduledStart', scheduledStart);
+      _ensureSessionCreds();
+      msgBoxEl().innerHTML = `
+        <div class="card" style="text-align:center; padding:16px; border-color:var(--success); border-width:2px;">
+          <div style="font-size:28px; margin-bottom:6px;">🚀</div>
+          <div style="font-weight:700; color:var(--success);">Exam has started! Redirecting…</div>
+        </div>`;
+      setTimeout(() => { location.href = '/exam.html'; }, 800);
+      return;
+    }
+
+    if (diffToUnlock <= 0) {
+      // 2-min window reached — auto redirect to disclaimer page
+      clearInterval(_notStartedInterval);
+      localStorage.setItem('examScheduledStart', scheduledStart);
+      _ensureSessionCreds();
+      msgBoxEl().innerHTML = `
+        <div class="card" style="text-align:center; padding:20px; border-color:#4f46e5; border-width:2px;">
+          <div style="font-size:32px; margin-bottom:8px;">📋</div>
+          <div style="font-weight:800; font-size:15px; color:#4f46e5; margin-bottom:4px;">Taking you to instructions…</div>
+          <div style="color:var(--muted); font-size:13px;">Exam starts at <strong>${startStr}</strong></div>
+        </div>`;
+      setTimeout(() => { location.href = '/exam.html'; }, 1000);
+      return;
+    }
+
+    // Still in Phase 1 — count down to unlock time
+    const totalSecs = Math.floor(diffToUnlock / 1000);
+    const hh = Math.floor(totalSecs / 3600);
+    const mm = Math.floor((totalSecs % 3600) / 60);
+    const ss = totalSecs % 60;
+
+    // Update numbers only if already rendered
+    const phaseEl = document.getElementById('_cdPhase');
+    if (phaseEl && phaseEl.dataset.phase === '1') {
+      if (hh > 0) { const el = document.getElementById('_preHH'); if (el) el.textContent = pad(hh); }
+      const mmEl = document.getElementById('_cdMM'); if (mmEl) mmEl.textContent = pad(mm);
+      const ssEl = document.getElementById('_cdSS'); if (ssEl) ssEl.textContent = pad(ss);
+      return;
+    }
+
+    const hoursBlock = hh > 0 ? `
+      <div style="background:var(--bg); border:1.5px solid var(--border); border-radius:10px; padding:10px 16px; min-width:60px; text-align:center;">
+        <div style="font-size:26px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1;" id="_preHH">${pad(hh)}</div>
+        <div style="font-size:9px; color:var(--muted); text-transform:uppercase; margin-top:2px;">Hrs</div>
+      </div>
+      <div style="font-size:22px; font-weight:900; color:var(--muted); padding-top:6px;">:</div>` : '';
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Waiting…'; }
+    msgBoxEl().innerHTML = `
+      <div class="card" style="text-align:center; padding:24px; border-color:var(--warning);">
+        <div style="font-size:36px; margin-bottom:10px;">⏰</div>
+        <div style="font-weight:800; font-size:16px; margin-bottom:4px;">Exam Not Started Yet</div>
+        <div style="color:var(--muted); font-size:12.5px; margin-bottom:18px;">
+          Exam starts at <strong>${startStr}</strong>
+        </div>
+        <div style="font-size:11px; color:var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">You will be redirected to instructions in</div>
+        <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-bottom:14px;">
+          ${hoursBlock}
+          <div style="background:var(--bg); border:1.5px solid var(--border); border-radius:10px; padding:10px 16px; min-width:60px; text-align:center;">
+            <div style="font-size:26px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1;" id="_cdMM">${pad(mm)}</div>
+            <div style="font-size:9px; color:var(--muted); text-transform:uppercase; margin-top:2px;">Min</div>
+          </div>
+          <div style="font-size:22px; font-weight:900; color:var(--muted); padding-top:6px;">:</div>
+          <div style="background:var(--bg); border:1.5px solid var(--border); border-radius:10px; padding:10px 16px; min-width:60px; text-align:center;">
+            <div style="font-size:26px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1;" id="_cdSS">${pad(ss)}</div>
+            <div style="font-size:9px; color:var(--muted); text-transform:uppercase; margin-top:2px;">Sec</div>
+          </div>
+        </div>
+        <div id="_cdPhase" data-phase="1" style="font-size:12px; color:var(--muted); line-height:1.6;">
+          You will be automatically taken to the instructions page 2 minutes before the exam starts.<br>
+          Please keep this tab open.
+        </div>
+      </div>`;
+  }
+
+  tick();
+  _notStartedInterval = setInterval(tick, 1000);
+}
+
+function msgBoxEl() { return document.getElementById('messageBox'); }
+/* ── Ensure session credentials are set before redirecting ── */
+function _ensureSessionCreds() {
+  const tid  = localStorage.getItem('testId');
+  const name = localStorage.getItem('studentName');
+  const reg  = localStorage.getItem('studentReg');
+  if (tid)  sessionStorage.setItem('testId', tid);
+  if (name) sessionStorage.setItem('studentName', name);
+  if (reg)  sessionStorage.setItem('studentReg', reg);
+}

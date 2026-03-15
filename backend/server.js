@@ -261,10 +261,16 @@ app.post('/api/student/validate', async (req, res) => {
   // Schedule window check — only block students who have NOT yet attempted
   const now = new Date();
   if (test.scheduledStart && now < test.scheduledStart) {
-    return res.status(403).json({
-      message: 'Exam has not started yet. Scheduled start: ' + new Date(test.scheduledStart).toLocaleString(),
-      scheduledStart: test.scheduledStart
-    });
+    const minsUntilStart = (new Date(test.scheduledStart) - now) / 60000;
+    // Allow entry within 7 minutes of start — frontend will show countdown
+    if (minsUntilStart > 2) {
+      return res.status(403).json({
+        message: 'Exam has not started yet. Scheduled start: ' + new Date(test.scheduledStart).toLocaleString(),
+        scheduledStart: test.scheduledStart,
+        minsUntilStart: Math.ceil(minsUntilStart)
+      });
+    }
+    // Within 7 mins — let them through with scheduledStart so frontend shows countdown
   }
   if (test.scheduledEnd && now > test.scheduledEnd) {
     return res.status(403).json({
@@ -273,7 +279,11 @@ app.post('/api/student/validate', async (req, res) => {
     });
   }
 
-  res.json({ attempted: false });
+  // Include scheduledStart so frontend knows to show countdown if exam hasn't started yet
+  res.json({
+    attempted: false,
+    scheduledStart: test.scheduledStart || null
+  });
 });
 
 /* ─────────────── SCORING HELPER ─────────────── */

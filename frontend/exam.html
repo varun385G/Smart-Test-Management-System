@@ -235,15 +235,81 @@
       </div>
 
       <!-- Confirm button -->
-      <div style="padding:20px 28px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
-        <div style="font-size:13px; color:var(--muted); flex:1;">By clicking <strong>I Understand, Start Exam</strong> you confirm that you have read and agree to follow these rules.</div>
-        <button id="startExamBtn" class="btn btn-primary" style="flex-shrink:0;" onclick="startExam()">
-          I Understand, Start Exam →
+      <div style="padding:20px 28px; border-top:1px solid var(--border);">
+        <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer; margin-bottom:16px; padding:14px 16px; background:var(--bg); border-radius:10px; border:1.5px solid var(--border); transition:border-color 0.2s;" id="agreeLabel">
+          <input type="checkbox" id="agreeCheckbox" onchange="toggleStartBtn()" style="width:18px; height:18px; margin-top:1px; accent-color:var(--primary); cursor:pointer; flex-shrink:0;">
+          <span style="font-size:13.5px; color:var(--text); line-height:1.5;">
+            I have read and understood all the instructions. I agree to follow the exam rules and will not engage in any malpractice. I understand that violations will be recorded and my exam may be locked.
+          </span>
+        </label>
+        <button id="startExamBtn" class="btn btn-primary" style="width:100%; opacity:0.45; cursor:not-allowed;" disabled onclick="startExam()">
+          ✅ I Understand, Start Exam →
         </button>
       </div>
 
     </div>
   </div>
+
+
+  <!-- ══════════════════════════════════════════
+       WAITING ROOM — shown when scheduledStart is in future
+  ══════════════════════════════════════════ -->
+  <div id="waitingRoomScreen" style="display:none; min-height:100vh; display:none; align-items:center; justify-content:center; background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%);">
+    <div style="text-align:center; color:white; padding:40px 20px; max-width:560px; width:90%;">
+      <div style="font-size:56px; margin-bottom:16px;">⏳</div>
+      <div style="font-size:22px; font-weight:800; margin-bottom:8px; letter-spacing:-0.5px;">Exam Starts In</div>
+      <div id="waitingRoomTitle" style="font-size:15px; opacity:0.7; margin-bottom:32px;"></div>
+
+      <!-- Big countdown -->
+      <div style="display:flex; justify-content:center; gap:16px; margin-bottom:32px; flex-wrap:wrap;">
+        <div style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:14px; padding:18px 24px; min-width:80px;">
+          <div id="cdHours" style="font-size:42px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1;">00</div>
+          <div style="font-size:11px; opacity:0.6; text-transform:uppercase; letter-spacing:1px; margin-top:4px;">Hours</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:14px; padding:18px 24px; min-width:80px;">
+          <div id="cdMinutes" style="font-size:42px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1;">00</div>
+          <div style="font-size:11px; opacity:0.6; text-transform:uppercase; letter-spacing:1px; margin-top:4px;">Minutes</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:14px; padding:18px 24px; min-width:80px;">
+          <div id="cdSeconds" style="font-size:42px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1;">00</div>
+          <div style="font-size:11px; opacity:0.6; text-transform:uppercase; letter-spacing:1px; margin-top:4px;">Seconds</div>
+        </div>
+      </div>
+
+      <div style="font-size:13px; opacity:0.55; margin-bottom:8px;">Scheduled start:</div>
+      <div id="waitingScheduledTime" style="font-size:15px; font-weight:700; opacity:0.85;"></div>
+
+      <div style="margin-top:28px; background:rgba(255,255,255,0.06); border-radius:12px; padding:14px 18px; font-size:13px; opacity:0.65; line-height:1.6;">
+        Please keep this tab open. The exam will automatically notify you when it begins.
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       EXAM LIVE POPUP — appears when countdown hits 0
+  ══════════════════════════════════════════ -->
+  <div id="examLivePopup" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.75); align-items:center; justify-content:center;">
+    <div style="background:white; border-radius:20px; padding:44px 36px; max-width:440px; width:90%; text-align:center; box-shadow:0 32px 80px rgba(0,0,0,0.4); animation:popIn 0.4s cubic-bezier(0.34,1.56,0.64,1);">
+      <div style="font-size:64px; margin-bottom:16px; animation:pulse 1s infinite;">🚀</div>
+      <h2 style="font-size:26px; font-weight:900; color:#0f172a; margin-bottom:8px; letter-spacing:-0.5px;">Exam is Now Live!</h2>
+      <p style="color:#64748b; font-size:14.5px; margin-bottom:28px; line-height:1.6;">
+        The exam window has opened.<br>Click below to begin your exam.
+      </p>
+      <div style="background:#f1f5f9; border-radius:10px; padding:12px 16px; margin-bottom:24px; font-size:13px; color:#475569;">
+        ⏱️ Your exam timer starts as soon as you click <strong>Enter Exam</strong>
+      </div>
+      <button onclick="enterExamFromWaiting()" class="btn btn-primary" style="width:100%; font-size:16px; padding:14px; font-weight:800; letter-spacing:0.3px;">
+        Enter Exam →
+      </button>
+    </div>
+  </div>
+
+  <style>
+    @keyframes popIn {
+      from { transform: scale(0.7); opacity:0; }
+      to   { transform: scale(1);   opacity:1; }
+    }
+  </style>
 
   <!-- Top progress bar -->
   <div style="height:4px; background:var(--border); position:sticky; top:0; z-index:200;">

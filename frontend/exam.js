@@ -29,15 +29,33 @@ let elapsedSeconds      = 0;      // how many seconds have passed since exam sta
 let elapsedInterval     = null;
 const MAX_VIOLATIONS    = 3;
 
+let scheduledStartTime  = null;   // Date object if exam has a scheduled start
+let waitingInterval     = null;   // countdown interval for waiting room
+
 let lastViolationTime = 0;
 const VIOLATION_COOLDOWN_MS = 1500;
 const violationLog = [];
 
-const testId      = localStorage.getItem('testId');
-const studentName = localStorage.getItem('studentName');
-const studentReg  = localStorage.getItem('studentReg');
+// sessionStorage is tab-isolated — each tab keeps its own student credentials
+// This prevents multi-tab cross-contamination where Tab2's login overwrites Tab1's data
+let testId      = sessionStorage.getItem('testId');
+let studentName = sessionStorage.getItem('studentName');
+let studentReg  = sessionStorage.getItem('studentReg');
 
-if (!testId || !studentReg) location.href = '/';
+// Fallback: if sessionStorage is empty (e.g. opened via bookmark), try localStorage
+if (!testId || !studentReg) {
+  testId      = localStorage.getItem('testId');
+  studentName = localStorage.getItem('studentName');
+  studentReg  = localStorage.getItem('studentReg');
+  // If found in localStorage, copy back to sessionStorage for this tab
+  if (testId && studentReg) {
+    sessionStorage.setItem('testId', testId);
+    sessionStorage.setItem('studentName', studentName || '');
+    sessionStorage.setItem('studentReg', studentReg);
+  }
+}
+
+if (!testId || !studentReg) { location.href = '/'; }
 
 /* ── Security events ──────────────────────── */
 document.addEventListener('visibilitychange', () => {
@@ -84,6 +102,145 @@ function recordViolation(reason) {
 }
 
 function closeWarning() { document.getElementById('warningBox').classList.remove('open'); }
+
+/* ── Checkbox toggle ──────────────────────── */
+function toggleStartBtn() {
+  const cb  = document.getElementById('agreeCheckbox');
+  const btn = document.getElementById('startExamBtn');
+  const lbl = document.getElementById('agreeLabel');
+  if (!btn) return;
+  if (cb && cb.checked) {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.style.cursor  = 'pointer';
+    if (lbl) { lbl.style.borderColor = 'var(--primary)'; lbl.style.background = '#eff6ff'; }
+  } else {
+    btn.disabled = true;
+    btn.style.opacity = '0.45';
+    btn.style.cursor  = 'not-allowed';
+    if (lbl) { lbl.style.borderColor = 'var(--border)'; lbl.style.background = 'var(--bg)'; }
+  }
+}
+
+/* ── Waiting Room ─────────────────────────── */
+function showWaitingRoom(scheduledStart, testTitle) {
+  const wr = document.getElementById('waitingRoomScreen');
+  const ds = document.getElementById('disclaimerScreen');
+  if (ds) ds.style.display = 'none';
+  if (wr) { wr.style.display = 'flex'; }
+
+  const titleEl = document.getElementById('waitingRoomTitle');
+  const timeEl  = document.getElementById('waitingScheduledTime');
+  if (titleEl) titleEl.textContent = testTitle || 'Upcoming Exam';
+  if (timeEl)  timeEl.textContent  = new Date(scheduledStart).toLocaleString('en-IN', {
+    weekday:'long', year:'numeric', month:'long', day:'numeric',
+    hour:'2-digit', minute:'2-digit'
+  });
+
+  // Start countdown
+  clearInterval(waitingInterval);
+  waitingInterval = setInterval(() => {
+    const diff = new Date(scheduledStart) - new Date();
+    if (diff <= 0) {
+      clearInterval(waitingInterval);
+      showExamLivePopup();
+      return;
+    }
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    const pad = n => String(n).padStart(2, '0');
+    const cdH = document.getElementById('cdHours');
+    const cdM = document.getElementById('cdMinutes');
+    const cdS = document.getElementById('cdSeconds');
+    if (cdH) cdH.textContent = pad(h);
+    if (cdM) cdM.textContent = pad(m);
+    if (cdS) cdS.textContent = pad(s);
+  }, 1000);
+}
+
+function showExamLivePopup() {
+  const wr = document.getElementById('waitingRoomScreen');
+  const popup = document.getElementById('examLivePopup');
+  if (wr) wr.style.display = 'none';
+  if (popup) popup.style.display = 'flex';
+}
+
+function enterExamFromWaiting() {
+  const popup = document.getElementById('examLivePopup');
+  if (popup) popup.style.display = 'none';
+  examStarted = true;
+  localStorage.setItem('disclaimerSeen_' + testId, '1');
+  function begin() {
+    startTimer();
+    autoSaveInterval = setInterval(autoSaveProgress, 10000);
+    updateSubmitLock();
+    renderQuestion(0);
+  }
+  if (examReady) { begin(); }
+  else { const w = setInterval(() => { if (examReady) { clearInterval(w); begin(); } }, 100); }
+}
+
+/* ── Disclaimer 2-min countdown ──────────────── */
+let _disclaimerCountdownInterval = null;
+
+function showDisclaimerCountdown(scheduledStart) {
+  clearInterval(_disclaimerCountdownInterval);
+
+  // Disable start button, show countdown above it
+  const btn = document.getElementById('startExamBtn');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.45'; btn.style.cursor = 'not-allowed'; }
+
+  // Insert countdown bar above the button inside the disclaimer footer
+  const footer = btn ? btn.parentElement : null;
+  let cdBar = document.getElementById('disclaimerCdBar');
+  if (!cdBar && footer) {
+    cdBar = document.createElement('div');
+    cdBar.id = 'disclaimerCdBar';
+    cdBar.style.cssText = 'margin-bottom:14px; text-align:center;';
+    footer.insertBefore(cdBar, btn);
+  }
+
+  function tick() {
+    const diff = new Date(scheduledStart) - new Date();
+    if (diff <= 0) {
+      clearInterval(_disclaimerCountdownInterval);
+      localStorage.removeItem('examScheduledStart');
+      scheduledStartTime = null; // clear so startExam() doesn't loop back
+      if (cdBar) cdBar.innerHTML = `<div style="color:var(--success); font-weight:700; font-size:15px; padding:10px 0;">🟢 Exam is now live!</div>`;
+      if (btn) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+        btn.style.background = '#16a34a';
+        btn.textContent = '🚀 Start Exam Now →';
+      }
+      return;
+    }
+    const totalSecs = Math.floor(diff / 1000);
+    const mm = Math.floor(totalSecs / 60);
+    const ss = totalSecs % 60;
+    const pad = n => String(n).padStart(2, '0');
+    if (cdBar) {
+      cdBar.innerHTML = `
+        <div style="font-size:12px; color:var(--muted); margin-bottom:8px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Exam starts in</div>
+        <div style="display:inline-flex; gap:10px; justify-content:center;">
+          <div style="background:var(--bg); border:1.5px solid var(--border); border-radius:8px; padding:8px 14px; min-width:52px; text-align:center;">
+            <div style="font-size:24px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1; color:var(--primary);">${pad(mm)}</div>
+            <div style="font-size:9px; color:var(--muted); text-transform:uppercase; margin-top:2px;">Min</div>
+          </div>
+          <div style="font-size:24px; font-weight:900; color:var(--muted); line-height:52px;">:</div>
+          <div style="background:var(--bg); border:1.5px solid var(--border); border-radius:8px; padding:8px 14px; min-width:52px; text-align:center;">
+            <div style="font-size:24px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1; color:var(--primary);">${pad(ss)}</div>
+            <div style="font-size:9px; color:var(--muted); text-transform:uppercase; margin-top:2px;">Sec</div>
+          </div>
+        </div>`;
+    }
+  }
+
+  tick();
+  _disclaimerCountdownInterval = setInterval(tick, 1000);
+}
 
 /* ── Lock Exam ────────────────────────────── */
 async function lockExam() {
@@ -346,7 +503,7 @@ function renderQuestion(qi) {
       <div class="right-btns">
         <button class="btn btn-sm" onclick="clearAnswer(${qi})">Clear</button>
         ${isLast
-          ? `<button class="btn-save-next" onclick="saveAndNext(${qi})">Save</button>`
+          ? `<button class="btn-save-next" id="saveOnlyBtn" onclick="saveOnly(${qi})" style="${isAnswered(qi) ? 'background:var(--success);color:white;border-color:var(--success);' : ''}">Save</button>`
           : `<button class="btn-save-next" onclick="saveAndNext(${qi})">Save &amp; Next →</button>`
         }
       </div>
@@ -383,6 +540,32 @@ function handleNAT(qi, input) {
   saveNow();
 }
 
+/* ── Save Only (last question — saves answer, does NOT submit) ── */
+function saveOnly(qi) {
+  const hasAnswer = isAnswered(qi);
+  if (hasAnswer) {
+    if (questionStatus[qi] !== 'review') questionStatus[qi] = 'answered';
+  } else {
+    questionStatus[qi] = 'skipped';
+  }
+  updateAllNavBtns();
+  updateProgress();
+  saveNow();
+  // Turn button green if answered, back to normal if not
+  const btn = document.getElementById('saveOnlyBtn');
+  if (btn) {
+    if (hasAnswer) {
+      btn.style.background = 'var(--success)';
+      btn.style.color = 'white';
+      btn.style.borderColor = 'var(--success)';
+    } else {
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }
+  }
+}
+
 /* ── Save & Next ──────────────────────────── */
 function saveAndNext(qi) {
   const hasAnswer = isAnswered(qi);
@@ -394,11 +577,9 @@ function saveAndNext(qi) {
   updateAllNavBtns();
   updateProgress();
   saveNow();
-
+  // Only navigate forward — NEVER triggers submit
   if (qi < questions.length - 1) {
     renderQuestion(qi + 1);
-  } else {
-    handleSubmitClick();
   }
 }
 
@@ -515,34 +696,47 @@ async function finalSubmit() {
   clearInterval(autoSaveInterval);
   clearInterval(elapsedInterval);
 
-  // Clear disclaimer + position flags so next student on same device starts fresh
   localStorage.removeItem('disclaimerSeen_' + testId);
   localStorage.removeItem('currentIndex_' + testId);
 
   document.getElementById('confirmBox').classList.remove('open');
 
+  // Show submitting overlay
+  const ovl = document.createElement('div');
+  ovl.id = '_submitOvl';
+  ovl.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(15,23,42,0.7);display:flex;align-items:center;justify-content:center;font-family:var(--font-main);';
+  ovl.innerHTML = '<div style="background:var(--card);border-radius:16px;padding:36px 32px;text-align:center;max-width:300px;width:90%;"><div style="font-size:40px;margin-bottom:12px;">📤</div><div style="font-weight:700;font-size:16px;margin-bottom:6px;">Submitting your exam…</div><div style="color:var(--muted);font-size:13px;">Please do not close this tab.</div></div>';
+  document.body.appendChild(ovl);
+
   const remapped = remapAnswers();
-
-  try {
-    await fetch('/api/exam/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ testId, studentName, studentReg, answers: remapped, violationLog })
-    });
-  } catch (_) {}
-
-  showSubmittedScreen();
+  let success = false;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch('/api/exam/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testId, studentName, studentReg, answers: remapped, violationLog })
+      });
+      if (res.ok) { success = true; break; }
+    } catch (_) {
+      if (attempt < 3) await new Promise(r => setTimeout(r, 1000));
+    }
+  }
+  ovl.remove();
+  showSubmittedScreen(success);
 }
 
-function showSubmittedScreen() {
+function showSubmittedScreen(success = true) {
   examSubmitted = true;
   document.body.innerHTML = `
     <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); font-family:var(--font-main);">
       <div class="card" style="max-width:400px; width:90%; text-align:center; padding:40px;">
-        <div style="font-size:56px; margin-bottom:16px;">✅</div>
-        <h2 style="font-size:22px; margin-bottom:8px;">Exam Submitted!</h2>
+        <div style="font-size:56px; margin-bottom:16px;">${success ? '✅' : '⚠️'}</div>
+        <h2 style="font-size:22px; margin-bottom:8px;">${success ? 'Exam Submitted!' : 'Submission Issue'}</h2>
         <p style="color:var(--muted); font-size:14px; margin-bottom:24px;">
-          Your answers have been recorded.<br>Results will be available once published by your staff.
+          ${success
+            ? 'Your answers have been recorded.<br>Results will be available once published by your staff.'
+            : 'There was a network error submitting your exam.<br><strong>Your answers were auto-saved.</strong><br>Please inform your invigilator immediately.'}
         </p>
         <button onclick="location.href='/'" class="btn btn-primary" style="width:100%;">Return to Home</button>
       </div>
@@ -574,6 +768,10 @@ async function loadExam() {
 
   document.getElementById('examTitle').textContent = test.title || 'Examination';
   document.title = test.title || 'Examination';
+
+  // Store scheduled start time — prefer localStorage value passed from student.js login
+  const storedStart = localStorage.getItem('examScheduledStart');
+  scheduledStartTime = storedStart || test.scheduledStart || null;
 
   // Populate staff credit bar
   const creditEl = document.getElementById('staffCreditText');
@@ -642,11 +840,6 @@ async function loadExam() {
     remainingSeconds = totalDurationSeconds;
   }
 
-  startTimer();
-
-  // Auto-save every 10 seconds (more frequent = better refresh recovery)
-  autoSaveInterval = setInterval(autoSaveProgress, 10000);
-
   document.getElementById('confirmTotal').textContent = questions.length;
 
   const hasNegative = questions.some(q => q.negativeMarkingEnabled && q.negativeMarks > 0);
@@ -657,8 +850,7 @@ async function loadExam() {
 
   buildNavigator();
   updateProgress();
-  updateSubmitLock();
-  // Don't render the first question yet — wait for student to dismiss disclaimer
+  // Don't start timer yet — wait for student to dismiss disclaimer
   examReady = true;
 }
 
@@ -700,21 +892,33 @@ function renderLockScreenOnly(lockCode) {
 
 /* ── Disclaimer screen ─────────────────── */
 function startExam() {
-  examStarted = true;  // now violations start counting
-  // Mark disclaimer as seen for this exam session
+  // If scheduledStartTime is still in future, show countdown (don't start yet)
+  // Note: scheduledStartTime is set to null when countdown reaches 0
+  if (scheduledStartTime && new Date() < new Date(scheduledStartTime)) {
+    showDisclaimerCountdown(scheduledStartTime);
+    return;
+  }
+
+  // Exam time has arrived — start exam
+  examStarted = true;
+  scheduledStartTime = null;
+  localStorage.removeItem('examScheduledStart');
   localStorage.setItem('disclaimerSeen_' + testId, '1');
   const screen = document.getElementById('disclaimerScreen');
   if (screen) screen.style.display = 'none';
-  // If exam data is ready, render first question now
-  if (examReady) {
+
+  function beginExam() {
+    startTimer();
+    autoSaveInterval = setInterval(autoSaveProgress, 10000);
+    updateSubmitLock();
     renderQuestion(0);
+  }
+
+  if (examReady) {
+    beginExam();
   } else {
-    // Data still loading — poll until ready
     const wait = setInterval(() => {
-      if (examReady) {
-        clearInterval(wait);
-        renderQuestion(0);
-      }
+      if (examReady) { clearInterval(wait); beginExam(); }
     }, 100);
   }
 }
@@ -722,20 +926,35 @@ function startExam() {
 document.addEventListener('DOMContentLoaded', () => {
   const alreadySeen = localStorage.getItem('disclaimerSeen_' + testId);
   if (alreadySeen) {
-    // Hide disclaimer immediately
+    // Hide disclaimer immediately — student already read it
     const screen = document.getElementById('disclaimerScreen');
     if (screen) screen.style.display = 'none';
     examStarted = true;
-    // Wait for loadExam to finish, then render the question
     const wait = setInterval(() => {
       if (examReady) {
         clearInterval(wait);
-        // Restore last visited question index if saved
+        startTimer();
+        autoSaveInterval = setInterval(autoSaveProgress, 10000);
+        updateSubmitLock();
         const savedIdx = parseInt(localStorage.getItem('currentIndex_' + testId) || '0', 10);
         const qi = (savedIdx >= 0 && savedIdx < questions.length) ? savedIdx : 0;
         renderQuestion(qi);
       }
     }, 100);
+  } else {
+    // Fresh load — check if auto-redirected from login page with a scheduled start
+    // If so, start the disclaimer countdown automatically after exam data loads
+    const storedStart = localStorage.getItem('examScheduledStart');
+    if (storedStart && new Date(storedStart) > new Date()) {
+      // Wait for loadExam to finish, then auto-trigger disclaimer countdown
+      const wait = setInterval(() => {
+        if (examReady) {
+          clearInterval(wait);
+          // Show disclaimer (it's visible by default) and start countdown
+          showDisclaimerCountdown(storedStart);
+        }
+      }, 100);
+    }
   }
   loadExam();
 });
