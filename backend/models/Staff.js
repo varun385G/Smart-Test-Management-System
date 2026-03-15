@@ -26,6 +26,16 @@ const staffSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  },
+
+  securityQuestion: {
+    type: String,
+    default: ''
+  },
+
+  securityAnswer: {
+    type: String,
+    default: ''
   }
 });
 

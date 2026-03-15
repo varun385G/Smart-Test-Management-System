@@ -17,7 +17,11 @@ app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 
 /* ─────────────── DATABASE ─────────────── */
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_URI, {
+  maxPoolSize: 10,              // stay within Atlas M0 connection limit
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+})
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => { console.error('❌ MongoDB error:', err); process.exit(1); });
 
@@ -233,21 +237,8 @@ app.post('/api/student/validate', async (req, res) => {
   if (!test) return res.status(404).json({ message: 'Test not found' });
   if (test.password !== password) return res.status(401).json({ message: 'Invalid password' });
 
-  // Schedule window check
-  const now = new Date();
-  if (test.scheduledStart && now < test.scheduledStart) {
-    return res.status(403).json({
-      message: 'Exam has not started yet. Scheduled start: ' + new Date(test.scheduledStart).toLocaleString(),
-      scheduledStart: test.scheduledStart
-    });
-  }
-  if (test.scheduledEnd && now > test.scheduledEnd) {
-    return res.status(403).json({
-      message: 'Exam window has ended. It ended at: ' + new Date(test.scheduledEnd).toLocaleString(),
-      scheduledEnd: test.scheduledEnd
-    });
-  }
-
+  // Check if student already attempted FIRST — returning students must always
+  // be able to see their result status even after the exam window has closed.
   const existing = await Result.findOne({ testId, studentReg: reg });
   if (existing) {
     if (existing.isLocked) {
@@ -266,6 +257,22 @@ app.post('/api/student/validate', async (req, res) => {
       resultsPublished: test.resultsPublished
     });
   }
+
+  // Schedule window check — only block students who have NOT yet attempted
+  const now = new Date();
+  if (test.scheduledStart && now < test.scheduledStart) {
+    return res.status(403).json({
+      message: 'Exam has not started yet. Scheduled start: ' + new Date(test.scheduledStart).toLocaleString(),
+      scheduledStart: test.scheduledStart
+    });
+  }
+  if (test.scheduledEnd && now > test.scheduledEnd) {
+    return res.status(403).json({
+      message: 'Exam window has ended. It ended at: ' + new Date(test.scheduledEnd).toLocaleString(),
+      scheduledEnd: test.scheduledEnd
+    });
+  }
+
   res.json({ attempted: false });
 });
 
@@ -645,6 +652,78 @@ app.get('/api/admin/results/grouped', async (req, res) => {
 });
 
 
+/* ─────────────── SETUP SECURITY QUESTION (from dashboard) ─────────────── */
+app.post('/api/staff/security-question/setup', async (req, res) => {
+  try {
+    const { staffId, currentPassword, securityQuestion, securityAnswer } = req.body;
+    if (!staffId || !currentPassword || !securityQuestion || !securityAnswer)
+      return res.status(400).json({ message: 'All fields are required' });
+
+    const staff = await Staff.findById(staffId);
+    if (!staff) return res.status(404).json({ message: 'Staff not found' });
+
+    const match = await bcrypt.compare(currentPassword, staff.password);
+    if (!match) return res.status(401).json({ message: 'Current password is incorrect' });
+
+    staff.securityQuestion = securityQuestion.trim();
+    staff.securityAnswer   = securityAnswer.trim().toLowerCase(); // store lowercase for case-insensitive match
+    await staff.save();
+    res.json({ message: 'Security question saved successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to save security question' });
+  }
+});
+
+/* ─────────────── GET SECURITY QUESTION (for forgot password page) ─────────────── */
+app.post('/api/staff/security-question/get', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: 'Email is required' });
+    const staff = await Staff.findOne({ email });
+    if (!staff) return res.status(404).json({ message: 'No account found with this email' });
+    if (!staff.securityQuestion)
+      return res.status(404).json({ message: 'No security question set for this account. Contact another admin.' });
+    res.json({ securityQuestion: staff.securityQuestion });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/* ─────────────── RESET PASSWORD VIA SECURITY QUESTION ─────────────── */
+app.post('/api/staff/forgot-password', async (req, res) => {
+  try {
+    const { email, securityAnswer, newPassword } = req.body;
+    if (!email || !securityAnswer || !newPassword)
+      return res.status(400).json({ message: 'All fields are required' });
+    if (newPassword.length < 4)
+      return res.status(400).json({ message: 'New password must be at least 4 characters' });
+
+    const staff = await Staff.findOne({ email });
+    if (!staff) return res.status(404).json({ message: 'No account found with this email' });
+    if (!staff.securityAnswer)
+      return res.status(400).json({ message: 'No security question set. Contact another admin.' });
+
+    if (staff.securityAnswer !== securityAnswer.trim().toLowerCase())
+      return res.status(401).json({ message: 'Security answer is incorrect' });
+
+    staff.password = await bcrypt.hash(newPassword, 10);
+    await staff.save();
+    res.json({ message: 'Password reset successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to reset password' });
+  }
+});
+
+/* ─────────────── PUBLIC: STAFF NAME LOOKUP (used by exam page) ─────────────── */
+app.get('/api/staff/name/:id', async (req, res) => {
+  try {
+    const staff = await Staff.findById(req.params.id, 'name');
+    if (!staff) return res.status(404).json({ name: null });
+    res.json({ name: staff.name });
+  } catch (err) {
+    res.status(400).json({ name: null });
+  }
+});
 /* ─────────────── QUESTION BANK ─────────────── */
 app.get('/api/question-bank/subjects', async (req, res) => {
   try {

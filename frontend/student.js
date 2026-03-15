@@ -29,6 +29,16 @@ async function handleSubmit() {
     const data = await res.json();
 
     if (!res.ok) {
+      if (res.status === 403 && data.scheduledStart) {
+        const startTime = new Date(data.scheduledStart).toLocaleString();
+        msgBox.innerHTML = `<div class="card" style="text-align:center; padding:20px; border-color:var(--warning);"><div style="font-size:36px; margin-bottom:8px;">⏰</div><div style="font-weight:700; margin-bottom:6px;">Exam Not Started Yet</div><div style="color:var(--muted); font-size:13.5px;">This exam is scheduled to start on<br><strong>${startTime}</strong></div></div>`;
+        return;
+      }
+      if (res.status === 403 && data.scheduledEnd) {
+        const endTime = new Date(data.scheduledEnd).toLocaleString();
+        msgBox.innerHTML = `<div class="card" style="text-align:center; padding:20px; border-color:var(--danger);"><div style="font-size:36px; margin-bottom:8px;">🔒</div><div style="font-weight:700; margin-bottom:6px; color:var(--danger);">Exam Window Closed</div><div style="color:var(--muted); font-size:13.5px;">This exam ended on<br><strong>${endTime}</strong><br><span style="font-size:12px; margin-top:6px; display:block;">If you already attempted this exam, contact your staff to view your result.</span></div></div>`;
+        return;
+      }
       msgBox.innerHTML = `<div style="background:var(--danger-light); color:#991b1b; padding:12px 16px; border-radius:10px; font-size:13.5px; text-align:center;">${data.message || 'Validation failed'}</div>`;
       return;
     }

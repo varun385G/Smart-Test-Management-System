@@ -575,6 +575,26 @@ async function loadExam() {
   document.getElementById('examTitle').textContent = test.title || 'Examination';
   document.title = test.title || 'Examination';
 
+  // Populate staff credit bar
+  const creditEl = document.getElementById('staffCreditText');
+  if (creditEl) {
+    if (test.createdBy) {
+      try {
+        const staffRes = await fetch(`/api/staff/name/${test.createdBy}`);
+        if (staffRes.ok) {
+          const staffData = await staffRes.json();
+          creditEl.innerHTML = staffData.name
+            ? `Test created by <strong>${staffData.name}</strong>`
+            : `Test ID: <strong>${testId}</strong>`;
+        }
+      } catch (_) {
+        creditEl.innerHTML = `Test ID: <strong>${testId}</strong>`;
+      }
+    } else {
+      creditEl.innerHTML = `Test ID: <strong>${testId}</strong>`;
+    }
+  }
+
   const originalQuestions = test.questions || [];
   questions = test.shuffleQuestions !== false ? shuffleArray([...originalQuestions]) : [...originalQuestions];
 

@@ -21,8 +21,13 @@
       </div>
     </div>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
-      <button id="btnDownloadExcel" class="btn btn-sm" onclick="downloadExcel()" disabled>⬇ Excel</button>
-      <button id="btnDownloadPdf"   class="btn btn-sm" onclick="downloadPdf()"   disabled>⬇ PDF</button>
+      <div style="position:relative;">
+        <button id="btnDownload" class="btn btn-sm" onclick="toggleResultsDropdown(this)" disabled>⬇ Download ▾</button>
+        <div id="resultsDlDropdown" style="display:none; position:absolute; right:0; top:calc(100% + 4px); background:var(--card); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.12); z-index:50; min-width:130px; overflow:hidden;">
+          <button id="btnDownloadExcel" onclick="downloadExcel(); document.getElementById('resultsDlDropdown').style.display='none';" style="width:100%; text-align:left; padding:10px 16px; font-size:13.5px; background:none; border:none; cursor:pointer; color:var(--text); font-family:var(--font-main);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">📊 Excel</button>
+          <button id="btnDownloadPdf"   onclick="downloadPdf();   document.getElementById('resultsDlDropdown').style.display='none';" style="width:100%; text-align:left; padding:10px 16px; font-size:13.5px; background:none; border:none; cursor:pointer; color:var(--text); font-family:var(--font-main);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">📄 PDF</button>
+        </div>
+      </div>
     </div>
   </header>
 

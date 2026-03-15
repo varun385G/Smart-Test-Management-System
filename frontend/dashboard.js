@@ -27,8 +27,9 @@ document.addEventListener('click', (e) => {
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
 }
-['changeEmailModal','changePasswordModal'].forEach(id => {
-  document.getElementById(id).addEventListener('click', function(e) {
+['changeEmailModal','changePasswordModal','securityQuestionModal'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('click', function(e) {
     if (e.target === this) closeModal(id);
   });
 });
@@ -184,4 +185,50 @@ function goManageStaff() { window.location.href = '/manage-staff.html'; }
 function logout() {
   localStorage.clear();
   window.location.href = '/';
+}
+/* ── Security Question Setup ──────────────── */
+function openSecurityQuestion() {
+  document.getElementById('profileMenu').style.display = 'none';
+  document.getElementById('sqCurrentPw').value = '';
+  document.getElementById('sqQuestion').value = '';
+  document.getElementById('sqAnswer').value = '';
+  document.getElementById('sqMsg').textContent = '';
+  document.getElementById('securityQuestionModal').classList.add('open');
+}
+
+async function submitSecurityQuestion() {
+  const currentPassword    = document.getElementById('sqCurrentPw').value.trim();
+  const securityQuestion   = document.getElementById('sqQuestion').value;
+  const securityAnswer     = document.getElementById('sqAnswer').value.trim();
+  const msg                = document.getElementById('sqMsg');
+  msg.textContent = '';
+
+  if (!currentPassword)  { msg.style.color = 'var(--danger)'; msg.textContent = 'Enter your current password.'; return; }
+  if (!securityQuestion) { msg.style.color = 'var(--danger)'; msg.textContent = 'Please select a security question.'; return; }
+  if (!securityAnswer)   { msg.style.color = 'var(--danger)'; msg.textContent = 'Please enter your answer.'; return; }
+
+  const btn = document.querySelector('#securityQuestionModal .btn-primary');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  try {
+    const res = await fetch('/api/staff/security-question/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId, currentPassword, securityQuestion, securityAnswer })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msg.style.color = 'var(--success)';
+      msg.textContent = '✅ Security question saved!';
+      setTimeout(() => closeModal('securityQuestionModal'), 1500);
+    } else {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = data.message || 'Failed to save.';
+    }
+  } catch {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = 'Network error. Try again.';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Security Question';
+  }
 }

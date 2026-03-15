@@ -26,6 +26,7 @@
         <div style="padding:12px 16px; border-bottom:1px solid var(--border); font-size:12.5px; color:var(--muted);">Account Settings</div>
         <button onclick="openChangeEmail()" style="width:100%;text-align:left;padding:11px 16px;font-size:13.5px;background:none;border:none;cursor:pointer;color:var(--text);font-family:var(--font-main);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">✉️ Change Email</button>
         <button onclick="openChangePassword()" style="width:100%;text-align:left;padding:11px 16px;font-size:13.5px;background:none;border:none;cursor:pointer;color:var(--text);font-family:var(--font-main);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">🔑 Change Password</button>
+        <button onclick="openSecurityQuestion()" style="width:100%;text-align:left;padding:11px 16px;font-size:13.5px;background:none;border:none;cursor:pointer;color:var(--text);font-family:var(--font-main);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">🛡️ Set Security Question</button>
         <div style="border-top:1px solid var(--border);"></div>
         <button onclick="logout()" style="width:100%;text-align:left;padding:11px 16px;font-size:13.5px;background:none;border:none;cursor:pointer;color:var(--danger);font-family:var(--font-main);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">↩ Sign out</button>
       </div>
@@ -137,5 +138,43 @@
 
   <script src="ui.js"></script>
   <script src="dashboard.js"></script>
+
+  <!-- Security Question Modal -->
+  <div class="modal-overlay" id="securityQuestionModal">
+    <div class="modal-box" style="max-width:440px;">
+      <div class="modal-header">
+        <span class="modal-title">🛡️ Set Security Question</span>
+        <button class="modal-close" onclick="closeModal('securityQuestionModal')">✕</button>
+      </div>
+      <div style="padding:20px;">
+        <p style="color:var(--muted); font-size:13.5px; margin-bottom:18px;">
+          This question will be used to verify your identity if you forget your password.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Current Password <span style="color:var(--danger);">*</span></label>
+          <input id="sqCurrentPw" type="password" placeholder="Enter your current password">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Security Question <span style="color:var(--danger);">*</span></label>
+          <select id="sqQuestion" style="width:100%; padding:10px 12px; border:1.5px solid var(--border); border-radius:10px; font-size:14px; background:var(--bg); color:var(--text); font-family:var(--font-main);">
+            <option value="">— Select a question —</option>
+            <option>What is your mother's maiden name?</option>
+            <option>What was the name of your first school?</option>
+            <option>What is your pet's name?</option>
+            <option>What city were you born in?</option>
+            <option>What is your favourite teacher's name?</option>
+            <option>What was your childhood nickname?</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Your Answer <span style="color:var(--danger);">*</span></label>
+          <input id="sqAnswer" type="text" placeholder="Type your answer (case-insensitive)">
+        </div>
+        <p id="sqMsg" style="font-size:13px; margin-bottom:12px; min-height:18px;"></p>
+        <button class="btn btn-primary" style="width:100%;" onclick="submitSecurityQuestion()">Save Security Question</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

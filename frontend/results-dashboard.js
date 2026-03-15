@@ -1,8 +1,9 @@
 const staffId = localStorage.getItem("staffId");
+const _rdRole = localStorage.getItem("staffRole");
 
-if (!staffId) {
-  window.location.href = "/staff.html";
-}
+if (!staffId) { window.location.href = "/staff.html"; }
+// Admins should use admin-results.html, redirect them there
+if (_rdRole === 'admin') { window.location.href = "/admin-results.html"; }
 
 function goBack() {
   window.location.href = "/dashboard.html";

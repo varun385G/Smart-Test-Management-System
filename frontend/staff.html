@@ -27,6 +27,9 @@
       </div>
       <button class="btn btn-primary" style="width:100%; margin-top:4px;" onclick="login()">Login →</button>
       <p id="msg" style="color:var(--danger); margin-top:12px; font-size:13.5px; text-align:center;"></p>
+      <div style="text-align:center; margin-top:8px;">
+        <button onclick="openForgotPassword()" style="background:none; border:none; color:var(--primary); font-size:13px; cursor:pointer; font-weight:600; text-decoration:underline;">Forgot Password?</button>
+      </div>
     </div>
 
     <p style="text-align:center; margin-top:16px; font-size:13px; color:var(--muted);">
@@ -63,5 +66,141 @@
     }
     document.addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
   </script>
+
+  <!-- ── Forgot Password Modal ── -->
+  <div id="forgotModal" style="display:none; position:fixed; inset:0; z-index:999; background:rgba(15,23,42,0.55); display:none; align-items:center; justify-content:center;">
+    <div style="background:var(--card,#fff); border-radius:16px; padding:32px 28px; max-width:420px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.18);">
+
+      <!-- Step 1: Enter email -->
+      <div id="fpStep1">
+        <h3 style="margin-bottom:6px; font-size:18px;">Forgot Password</h3>
+        <p style="color:var(--muted,#64748b); font-size:13.5px; margin-bottom:20px;">Enter your registered email to get your security question.</p>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input id="fpEmail" type="email" placeholder="Enter your email">
+        </div>
+        <p id="fpMsg1" style="color:#dc2626; font-size:13px; margin-bottom:10px; min-height:18px;"></p>
+        <div style="display:flex; gap:10px;">
+          <button class="btn" style="flex:1;" onclick="closeForgotPassword()">Cancel</button>
+          <button class="btn btn-primary" style="flex:1;" onclick="fetchSecurityQuestion()">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Answer security question + new password -->
+      <div id="fpStep2" style="display:none;">
+        <h3 style="margin-bottom:6px; font-size:18px;">Security Question</h3>
+        <p style="color:var(--muted,#64748b); font-size:13.5px; margin-bottom:16px;">Answer your security question to reset your password.</p>
+        <div style="background:#f1f5f9; border-radius:10px; padding:12px 16px; margin-bottom:16px; font-size:14px; font-weight:600; color:#1e293b;" id="fpQuestionDisplay"></div>
+        <div class="form-group">
+          <label class="form-label">Your Answer</label>
+          <input id="fpAnswer" type="text" placeholder="Type your answer">
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <input id="fpNewPassword" type="password" placeholder="Enter new password (min 4 chars)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm New Password</label>
+          <input id="fpConfirmPassword" type="password" placeholder="Confirm new password">
+        </div>
+        <p id="fpMsg2" style="color:#dc2626; font-size:13px; margin-bottom:10px; min-height:18px;"></p>
+        <div style="display:flex; gap:10px;">
+          <button class="btn" style="flex:1;" onclick="backToStep1()">← Back</button>
+          <button class="btn btn-primary" style="flex:1;" id="fpResetBtn" onclick="submitForgotPassword()">Reset Password</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function openForgotPassword() {
+      document.getElementById('fpStep1').style.display = 'block';
+      document.getElementById('fpStep2').style.display = 'none';
+      document.getElementById('fpEmail').value = '';
+      document.getElementById('fpMsg1').textContent = '';
+      document.getElementById('fpMsg2').textContent = '';
+      document.getElementById('forgotModal').style.display = 'flex';
+    }
+    function closeForgotPassword() {
+      document.getElementById('forgotModal').style.display = 'none';
+    }
+    function backToStep1() {
+      document.getElementById('fpStep2').style.display = 'none';
+      document.getElementById('fpStep1').style.display = 'block';
+    }
+
+    async function fetchSecurityQuestion() {
+      const email = document.getElementById('fpEmail').value.trim();
+      const msg   = document.getElementById('fpMsg1');
+      msg.textContent = '';
+      if (!email) { msg.textContent = 'Please enter your email.'; return; }
+
+      try {
+        const res  = await fetch('/api/staff/security-question/get', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (!res.ok) { msg.textContent = data.message || 'Failed'; return; }
+
+        document.getElementById('fpQuestionDisplay').textContent = data.securityQuestion;
+        document.getElementById('fpAnswer').value = '';
+        document.getElementById('fpNewPassword').value = '';
+        document.getElementById('fpConfirmPassword').value = '';
+        document.getElementById('fpMsg2').textContent = '';
+        document.getElementById('fpStep1').style.display = 'none';
+        document.getElementById('fpStep2').style.display = 'block';
+      } catch {
+        msg.textContent = 'Server error. Try again.';
+      }
+    }
+
+    async function submitForgotPassword() {
+      const email       = document.getElementById('fpEmail').value.trim();
+      const answer      = document.getElementById('fpAnswer').value.trim();
+      const newPassword = document.getElementById('fpNewPassword').value.trim();
+      const confirmPass = document.getElementById('fpConfirmPassword').value.trim();
+      const msg         = document.getElementById('fpMsg2');
+      msg.textContent   = '';
+
+      if (!answer)           { msg.textContent = 'Please enter your answer.'; return; }
+      if (!newPassword)      { msg.textContent = 'Please enter a new password.'; return; }
+      if (newPassword.length < 4) { msg.textContent = 'Password must be at least 4 characters.'; return; }
+      if (newPassword !== confirmPass) { msg.textContent = 'Passwords do not match.'; return; }
+
+      const btn = document.getElementById('fpResetBtn');
+      btn.disabled = true; btn.textContent = 'Resetting…';
+
+      try {
+        const res  = await fetch('/api/staff/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, securityAnswer: answer, newPassword })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          msg.style.color = '#16a34a';
+          msg.textContent = '✅ Password reset! You can now log in.';
+          setTimeout(() => closeForgotPassword(), 1800);
+        } else {
+          msg.style.color = '#dc2626';
+          msg.textContent = data.message || 'Failed to reset password.';
+        }
+      } catch {
+        msg.style.color = '#dc2626';
+        msg.textContent = 'Server error. Try again.';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Reset Password';
+      }
+    }
+
+    // Close modal on backdrop click
+    document.getElementById('forgotModal').addEventListener('click', function(e) {
+      if (e.target === this) closeForgotPassword();
+    });
+  </script>
+
 </body>
 </html>

@@ -1,3 +1,6 @@
+const _arRole = localStorage.getItem('staffRole');
+if (_arRole !== 'admin') { window.location.href = '/dashboard.html'; throw new Error('Access denied'); }
+
 /* ── state ─────────────────────────────── */
 let allGroupedData = {};   // full API response, keyed by staffId
 
@@ -31,8 +34,7 @@ async function loadAdminResults() {
       Object.values(s.tests || {}).some(t => t.resultsPublished && t.results.length)
     );
     if (anyPublished) {
-      document.getElementById("btnDownloadAllExcel").disabled = false;
-      document.getElementById("btnDownloadAllPdf").disabled   = false;
+      document.getElementById("btnDownloadAll").disabled = false;
     }
 
     Object.values(data).forEach(staff => {
@@ -53,10 +55,15 @@ async function loadAdminResults() {
       );
       if (staffHasResults) {
         const staffBtns = document.createElement("div");
-        staffBtns.style.cssText = "display:flex; gap:8px; flex-wrap:wrap;";
+        staffBtns.style.cssText = "position:relative;";
         staffBtns.innerHTML = `
-          <button class="btn btn-primary" onclick="downloadStaffExcel('${staff.staffName}')">⬇ Excel</button>
-          <button class="btn btn-primary" onclick="downloadStaffPdf('${staff.staffName}')">⬇ PDF</button>
+          <button class="btn btn-primary" onclick="toggleDropdown(this)" style="gap:6px;">
+            ⬇ Download ▾
+          </button>
+          <div class="dl-dropdown" style="display:none; position:absolute; right:0; top:calc(100% + 4px); background:var(--card); border:1px solid var(--border); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.12); z-index:50; min-width:140px; overflow:hidden;">
+            <button onclick="downloadStaffExcel('${staff.staffName}'); closeAllDropdowns();" style="width:100%; text-align:left; padding:10px 16px; font-size:13.5px; background:none; border:none; cursor:pointer; color:var(--text); font-family:var(--font-main);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">📊 Excel</button>
+            <button onclick="downloadStaffPdf('${staff.staffName}'); closeAllDropdowns();" style="width:100%; text-align:left; padding:10px 16px; font-size:13.5px; background:none; border:none; cursor:pointer; color:var(--text); font-family:var(--font-main);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">📄 PDF</button>
+          </div>
         `;
         staffHeader.appendChild(staffBtns);
       }
@@ -94,19 +101,7 @@ async function loadAdminResults() {
 
         /* per-test download buttons (only if published and has results) */
         if (test.resultsPublished && test.results.length) {
-          const testBtns = document.createElement("div");
-          testBtns.style.cssText = "display:flex; gap:8px;";
-          testBtns.innerHTML = `
-            <button class="btn" style="font-size:13px; padding:4px 10px;"
-              onclick="downloadTestExcel('${testId}','${escapeAttr(test.testTitle)}','${escapeAttr(staff.staffName)}')">
-              ⬇ Excel
-            </button>
-            <button class="btn" style="font-size:13px; padding:4px 10px;"
-              onclick="downloadTestPdf('${testId}','${escapeAttr(test.testTitle)}','${escapeAttr(staff.staffName)}')">
-              ⬇ PDF
-            </button>
-          `;
-          testHeader.appendChild(testBtns);
+
         }
 
         testDiv.appendChild(testHeader);
@@ -407,3 +402,18 @@ function goBack() {
 }
 
 loadAdminResults();
+/* ── Dropdown helpers ─────────────────────── */
+function toggleDropdown(btn) {
+  const dropdown = btn.nextElementSibling;
+  const isOpen = dropdown.style.display === 'block';
+  closeAllDropdowns();
+  if (!isOpen) dropdown.style.display = 'block';
+}
+
+function closeAllDropdowns() {
+  document.querySelectorAll('.dl-dropdown').forEach(d => d.style.display = 'none');
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('[onclick*="toggleDropdown"]')) closeAllDropdowns();
+});

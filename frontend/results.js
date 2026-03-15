@@ -9,7 +9,7 @@ async function loadResults() {
   const tbody = document.getElementById('results');
   if (!tbody) return;
 
-  tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--muted);">Loading results...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--muted);">Loading results...</td></tr>`;
 
   try {
     // Use staff endpoint — no publish gate, staff always see results
@@ -31,7 +31,7 @@ async function loadResults() {
     } catch (_) {}
 
     if (!data.length) {
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--muted);">No attempts yet</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--muted);">No attempts yet</td></tr>`;
       return;
     }
 
@@ -63,14 +63,13 @@ async function loadResults() {
       tbody.appendChild(row);
     });
 
-    document.getElementById('btnDownloadExcel').disabled = false;
-    document.getElementById('btnDownloadPdf').disabled   = false;
+    document.getElementById('btnDownload').disabled = false;
 
     // Load analytics
     loadAnalytics();
 
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#dc2626;">Error loading results</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#dc2626;">Error loading results</td></tr>`;
   }
 }
 
@@ -210,3 +209,13 @@ function downloadPdf() {
 function goDashboard() { window.location.href = '/dashboard.html'; }
 
 loadResults();
+function toggleResultsDropdown(btn) {
+  const dd = document.getElementById('resultsDlDropdown');
+  dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('[onclick*="toggleResultsDropdown"]')) {
+    const dd = document.getElementById('resultsDlDropdown');
+    if (dd) dd.style.display = 'none';
+  }
+});

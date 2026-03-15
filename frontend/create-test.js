@@ -81,11 +81,14 @@ function populateForm(test) {
   // Restore schedule
   if (document.getElementById('scheduledStart') && test.scheduledStart) {
     const d = new Date(test.scheduledStart);
-    document.getElementById('scheduledStart').value = d.toISOString().slice(0,16);
+    // Shift to local time for the datetime-local input (which has no timezone)
+    const localISO = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    document.getElementById('scheduledStart').value = localISO;
   }
   if (document.getElementById('scheduledEnd') && test.scheduledEnd) {
     const d = new Date(test.scheduledEnd);
-    document.getElementById('scheduledEnd').value = d.toISOString().slice(0,16);
+    const localISO = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    document.getElementById('scheduledEnd').value = localISO;
   }
   if (document.getElementById('submitAfterMinutes') && test.submitAfterMinutes) {
     document.getElementById('submitAfterMinutes').value = test.submitAfterMinutes;
@@ -530,9 +533,16 @@ function collectFormData(validate = true) {
   const cards = [...document.querySelectorAll('.question-card')];
   const questions = cards.map(card => extractQuestion(Number(card.dataset.qid)));
 
-  const scheduledStartVal       = document.getElementById('scheduledStart')?.value;
-  const scheduledEndVal         = document.getElementById('scheduledEnd')?.value;
-  const submitAfterMinutesVal   = document.getElementById('submitAfterMinutes')?.value;
+  const scheduledStartRaw     = document.getElementById('scheduledStart')?.value;
+  const scheduledEndRaw       = document.getElementById('scheduledEnd')?.value;
+  const submitAfterMinutesVal = document.getElementById('submitAfterMinutes')?.value;
+
+  // datetime-local gives "YYYY-MM-DDTHH:mm" with NO timezone info.
+  // new Date("YYYY-MM-DDTHH:mm") is treated as UTC by the server, which is wrong for IST (+05:30).
+  // We convert to a full ISO string that includes the local timezone offset so the server
+  // stores and compares the exact moment the user intended.
+  const scheduledStartVal = scheduledStartRaw ? new Date(scheduledStartRaw).toISOString() : null;
+  const scheduledEndVal   = scheduledEndRaw   ? new Date(scheduledEndRaw).toISOString()   : null;
 
   return {
     title, password, duration, questions,

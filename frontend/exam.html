@@ -96,9 +96,73 @@
       padding: 10px 14px; border-radius: 10px; margin-bottom: 8px;
       font-size: 14px; font-weight: 600;
     }
+  
+    /* ── Watermark ── */
+    .exam-watermark {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      display: flex;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: 0;
+    }
+    .exam-watermark span {
+      display: block;
+      width: 420px;
+      font-size: 14px;
+      font-weight: 600;
+      color: rgba(0,0,0,0.042);
+      white-space: nowrap;
+      transform: rotate(-35deg);
+      transform-origin: center center;
+      letter-spacing: 4px;
+      user-select: none;
+      pointer-events: none;
+      padding: 38px 0;
+      text-transform: uppercase;
+    }
+    /* ── Staff credit footer ── */
+    #staffCreditBar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 99;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(6px);
+      border-top: 1px solid var(--border);
+      padding: 6px 20px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+      gap: 6px;
+    }
+    #staffCreditBar strong { color: var(--text); }
+
   </style>
 </head>
-<body>
+<body style="padding-bottom:36px;">
+
+  <!-- Fixed watermark — tiled diagonally -->
+  <div class="exam-watermark" id="examWatermark" aria-hidden="true"></div>
+  <script>
+    (function(){
+      var wm = document.getElementById('examWatermark');
+      var text = 'Smart Test Management System';
+      var count = 80; // enough to tile full screen
+      for(var i=0;i<count;i++){
+        var s = document.createElement('span');
+        s.textContent = text;
+        wm.appendChild(s);
+      }
+    })();
+  </script>
+
+  <!-- Staff credit bar -->
+  <div id="staffCreditBar">📋 <span id="staffCreditText">Loading test info…</span></div>
 
   <!-- ══════════════════════════════════════════
        MALPRACTICE DISCLAIMER SCREEN
@@ -263,8 +327,8 @@
 
         <!-- Summary grid -->
         <!-- hidden elements for backward compat with confirmSubmit -->
-        <input type="hidden" id="confirmAnswered" value="0">
-        <input type="hidden" id="confirmTotal" value="0">
+        <span id="confirmAnswered" style="display:none;">0</span>
+        <span id="confirmTotal" style="display:none;">0</span>
       <div id="submitSummary" style="margin-bottom:16px;">
           <div class="summary-row" style="background:#d1fae5; color:#065f46;">
             <span>Answered</span>
