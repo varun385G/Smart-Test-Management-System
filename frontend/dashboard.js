@@ -1,6 +1,6 @@
-const role      = localStorage.getItem('staffRole');
-const staffName = localStorage.getItem('staffName');
-const staffId   = localStorage.getItem('staffId');
+const role      = sessionStorage.getItem('staffRole');
+const staffName = sessionStorage.getItem('staffName');
+const staffId   = sessionStorage.getItem('staffId');
 
 if (!role || !staffName) window.location.href = '/staff.html';
 
@@ -63,7 +63,7 @@ async function submitChangeEmail() {
     if (res.ok) {
       msg.style.color = 'var(--success)';
       msg.innerText = 'Email updated! Please log in again.';
-      setTimeout(() => { localStorage.clear(); window.location.href = '/staff.html'; }, 1500);
+      setTimeout(() => { sessionStorage.clear(); window.location.href = '/staff.html'; }, 1500);
     } else {
       msg.style.color = 'var(--danger)'; msg.innerText = data.message || 'Failed.';
     }
@@ -108,7 +108,7 @@ async function submitChangePassword() {
     if (res.ok) {
       msg.style.color = 'var(--success)';
       msg.innerText = 'Password updated! Please log in again.';
-      setTimeout(() => { localStorage.clear(); window.location.href = '/staff.html'; }, 1500);
+      setTimeout(() => { sessionStorage.clear(); window.location.href = '/staff.html'; }, 1500);
     } else {
       msg.style.color = 'var(--danger)'; msg.innerText = data.message || 'Failed.';
     }
@@ -183,7 +183,7 @@ function goToResults() {
 function goCreateStaff() { window.location.href = '/create-staff.html'; }
 function goManageStaff() { window.location.href = '/manage-staff.html'; }
 function logout() {
-  localStorage.clear();
+  sessionStorage.clear();
   window.location.href = '/';
 }
 /* ── Security Question Setup ──────────────── */

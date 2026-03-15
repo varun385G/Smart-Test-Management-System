@@ -1,5 +1,5 @@
-const role = localStorage.getItem("staffRole");
-const staffName = localStorage.getItem("staffName");
+const role = sessionStorage.getItem("staffRole");
+const staffName = sessionStorage.getItem("staffName");
 
 if (!role || !staffName) {
   window.location.href = "/staff.html";
@@ -41,6 +41,6 @@ function goManageStaff() {
 }
 
 function logout() {
-  localStorage.clear();
+  sessionStorage.clear();
   window.location.href = "/";
 }

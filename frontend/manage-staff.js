@@ -1,4 +1,4 @@
-const role = localStorage.getItem("staffRole");
+const role = sessionStorage.getItem("staffRole");
 
 if (role !== "admin") {
   alert("Access denied");

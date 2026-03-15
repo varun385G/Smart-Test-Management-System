@@ -1,4 +1,4 @@
-const _arRole = localStorage.getItem('staffRole');
+const _arRole = sessionStorage.getItem('staffRole');
 if (_arRole !== 'admin') { window.location.href = '/dashboard.html'; throw new Error('Access denied'); }
 
 /* ── state ─────────────────────────────── */

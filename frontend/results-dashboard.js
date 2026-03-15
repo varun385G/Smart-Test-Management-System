@@ -1,5 +1,5 @@
-const staffId = localStorage.getItem("staffId");
-const _rdRole = localStorage.getItem("staffRole");
+const staffId = sessionStorage.getItem("staffId");
+const _rdRole = sessionStorage.getItem("staffRole");
 
 if (!staffId) { window.location.href = "/staff.html"; }
 // Admins should use admin-results.html, redirect them there

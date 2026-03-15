@@ -1,4 +1,4 @@
-const staffId = localStorage.getItem('staffId');
+const staffId = sessionStorage.getItem('staffId');
 if (!staffId) { document.body.innerHTML = '<div class="card center" style="padding:40px; margin:40px auto; max-width:400px;"><h2>Access denied</h2></div>'; throw new Error(); }
 
 let allTests = [];

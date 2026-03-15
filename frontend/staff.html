@@ -56,9 +56,9 @@
         const data = await res.json();
         if (!res.ok) { msg.textContent = data.message || 'Login failed'; return; }
 
-        localStorage.setItem('staffId',   data.staffId);
-        localStorage.setItem('staffName', data.name);
-        localStorage.setItem('staffRole', data.role);
+        sessionStorage.setItem('staffId',   data.staffId);
+        sessionStorage.setItem('staffName', data.name);
+        sessionStorage.setItem('staffRole', data.role);
         window.location.href = '/dashboard.html';
       } catch {
         msg.textContent = 'Server error. Try again.';

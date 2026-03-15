@@ -134,7 +134,7 @@ async function saveToBank() {
   const marks      = Number(document.getElementById('bMarks').value) || 1;
   const negMarks   = Number(document.getElementById('bNegMarks').value) || 0;
   const explanation = document.getElementById('bExplanation').value.trim();
-  const staffId    = localStorage.getItem('staffId');
+  const staffId    = sessionStorage.getItem('staffId');
 
   if (!question) { showToast('Question text is required', 'warn'); return; }
 

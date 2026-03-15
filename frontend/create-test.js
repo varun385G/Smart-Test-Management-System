@@ -607,7 +607,7 @@ async function saveTest() {
 
   try {
     const data = collectFormData(true);
-    const staffId = localStorage.getItem('staffId');
+    const staffId = sessionStorage.getItem('staffId');
 
     let url, method;
     if (editingTestId) {
@@ -689,7 +689,7 @@ async function openBankModal() {
   document.getElementById('bankQuestionList').innerHTML = '';
   document.getElementById('bankQuestionsSection').style.display = 'none';
 
-  const staffId = localStorage.getItem('staffId');
+  const staffId = sessionStorage.getItem('staffId');
   try {
     const res = await fetch(`/api/tests/by-staff/${staffId}`);
     bankTestList = await res.json();
