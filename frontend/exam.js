@@ -729,19 +729,126 @@ async function finalSubmit() {
 function showSubmittedScreen(success = true) {
   examSubmitted = true;
   document.body.innerHTML = `
-    <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); font-family:var(--font-main);">
-      <div class="card" style="max-width:400px; width:90%; text-align:center; padding:40px;">
-        <div style="font-size:56px; margin-bottom:16px;">${success ? '✅' : '⚠️'}</div>
-        <h2 style="font-size:22px; margin-bottom:8px;">${success ? 'Exam Submitted!' : 'Submission Issue'}</h2>
-        <p style="color:var(--muted); font-size:14px; margin-bottom:24px;">
-          ${success
-            ? 'Your answers have been recorded.<br>Results will be available once published by your staff.'
-            : 'There was a network error submitting your exam.<br><strong>Your answers were auto-saved.</strong><br>Please inform your invigilator immediately.'}
-        </p>
-        <button onclick="location.href='/'" class="btn btn-primary" style="width:100%;">Return to Home</button>
+    <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); font-family:var(--font-main); padding:20px;">
+      <div style="width:100%; max-width:480px;">
+
+        <!-- Submission status card -->
+        <div class="card" style="text-align:center; padding:32px; margin-bottom:20px;">
+          <div style="font-size:56px; margin-bottom:16px;">${success ? '✅' : '⚠️'}</div>
+          <h2 style="font-size:22px; margin-bottom:8px;">${success ? 'Exam Submitted!' : 'Submission Issue'}</h2>
+          <p style="color:var(--muted); font-size:14px; margin-bottom:0;">
+            ${success
+              ? 'Your answers have been recorded.<br>Results will be available once published by your staff.'
+              : 'There was a network error submitting your exam.<br><strong>Your answers were auto-saved.</strong><br>Please inform your invigilator immediately.'}
+          </p>
+        </div>
+
+        <!-- Feedback form (only on success) -->
+        ${success ? `
+        <div class="card" style="padding:28px;" id="feedbackCard">
+          <div style="font-size:15px; font-weight:800; margin-bottom:4px;">📝 Quick Feedback</div>
+          <div style="font-size:13px; color:var(--muted); margin-bottom:20px;">Rate your experience (1 = Very Poor, 5 = Excellent)</div>
+
+          ${[
+            ['q1','Overall functionality of the examination software'],
+            ['q2','Clarity and relevance of the questions'],
+            ['q3','Support and guidance provided by staff'],
+            ['q4','Overall experience with this online test system']
+          ].map(([id, label]) => `
+            <div style="margin-bottom:18px;">
+              <div style="font-size:13.5px; font-weight:600; margin-bottom:8px; color:var(--text);">${label}</div>
+              <div style="display:flex; gap:8px;">
+                ${[1,2,3,4,5].map(n => `
+                  <button type="button" onclick="selectRating('${id}',${n})" id="${id}_${n}"
+                    style="width:40px;height:40px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);font-weight:700;font-size:14px;cursor:pointer;transition:all 0.15s;"
+                    onmouseover="this.style.borderColor='var(--primary)'"
+                    onmouseout="if(!this.classList.contains('sel'))this.style.borderColor='var(--border)'">
+                    ${n}
+                  </button>`).join('')}
+              </div>
+            </div>`).join('')}
+
+          <div style="margin-bottom:18px;">
+            <label style="font-size:13.5px; font-weight:600; display:block; margin-bottom:8px; color:var(--text);">Suggestions (optional)</label>
+            <textarea id="fbSuggestion" rows="3" placeholder="Any suggestions or comments…"
+              style="width:100%; padding:10px 12px; border:1.5px solid var(--border); border-radius:10px; font-size:13.5px; font-family:var(--font-main); background:var(--bg); color:var(--text); resize:vertical; box-sizing:border-box;"></textarea>
+          </div>
+
+          <div id="fbMsg" style="font-size:13px; margin-bottom:10px; min-height:18px;"></div>
+          <div style="display:flex; gap:10px;">
+            <button onclick="submitFeedback()" class="btn btn-primary" style="flex:1;" id="fbSubmitBtn">Submit Feedback</button>
+            <button onclick="skipFeedback()" class="btn" style="flex:0 0 auto;">Skip</button>
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- Return home (shown after feedback or on failure) -->
+        <div id="returnHomeDiv" style="${success ? 'display:none;' : ''}">
+          <button onclick="location.href='/'" class="btn btn-primary" style="width:100%;">Return to Home</button>
+        </div>
+
       </div>
     </div>
   `;
+}
+
+/* ── Feedback helpers ─────────────────────── */
+const _fbRatings = {};
+
+function selectRating(qid, val) {
+  _fbRatings[qid] = val;
+  for (let i = 1; i <= 5; i++) {
+    const btn = document.getElementById(qid + '_' + i);
+    if (!btn) continue;
+    if (i <= val) {
+      btn.classList.add('sel');
+      btn.style.background = 'var(--primary)';
+      btn.style.color = 'white';
+      btn.style.borderColor = 'var(--primary)';
+    } else {
+      btn.classList.remove('sel');
+      btn.style.background = 'var(--bg)';
+      btn.style.color = '';
+      btn.style.borderColor = 'var(--border)';
+    }
+  }
+}
+
+async function submitFeedback() {
+  const required = ['q1','q2','q3','q4'];
+  const missing = required.filter(q => !_fbRatings[q]);
+  const msg = document.getElementById('fbMsg');
+  if (missing.length) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = 'Please rate all 4 questions before submitting.';
+    return;
+  }
+  const btn = document.getElementById('fbSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+  try {
+    await fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        testId, studentName, studentReg,
+        q1: _fbRatings.q1, q2: _fbRatings.q2,
+        q3: _fbRatings.q3, q4: _fbRatings.q4,
+        suggestion: (document.getElementById('fbSuggestion') || {}).value || ''
+      })
+    });
+  } catch (_) {}
+  const card = document.getElementById('feedbackCard');
+  if (card) card.innerHTML = '<div style="text-align:center;padding:20px;"><div style="font-size:32px;margin-bottom:8px;">🙏</div><div style="font-weight:700;">Thank you for your feedback!</div></div>';
+  const ret = document.getElementById('returnHomeDiv');
+  if (ret) { ret.style.display = 'block'; }
+  setTimeout(() => { location.href = '/'; }, 2000);
+}
+
+function skipFeedback() {
+  const card = document.getElementById('feedbackCard');
+  if (card) card.style.display = 'none';
+  const ret = document.getElementById('returnHomeDiv');
+  if (ret) ret.style.display = 'block';
 }
 
 /* ── Load Exam ────────────────────────────── */

@@ -782,6 +782,41 @@ app.delete('/api/question-bank/:id', async (req, res) => {
   }
 });
 
+
+/* ─────────────── FEEDBACK ─────────────── */
+const feedbackSchema = new (require('mongoose').Schema)({
+  testId:      String,
+  studentName: String,
+  studentReg:  String,
+  q1: Number, q2: Number, q3: Number, q4: Number,
+  suggestion:  String,
+  createdAt:   { type: Date, default: Date.now }
+});
+const Feedback = require('mongoose').models.Feedback ||
+  require('mongoose').model('Feedback', feedbackSchema);
+
+app.post('/api/feedback', async (req, res) => {
+  try {
+    const { testId, studentName, studentReg, q1, q2, q3, q4, suggestion } = req.body;
+    if (!testId || !studentReg) return res.status(400).json({ message: 'Missing fields' });
+    await Feedback.create({ testId, studentName, studentReg, q1, q2, q3, q4, suggestion: suggestion || '' });
+    res.json({ message: 'Feedback saved' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to save feedback' });
+  }
+});
+
+app.get('/api/feedback/:testId', async (req, res) => {
+  try {
+    const test = await Test.findOne({ testId: req.params.testId });
+    if (!test) return res.status(404).json({ message: 'Test not found' });
+    const feedbacks = await Feedback.find({ testId: req.params.testId }).sort({ createdAt: -1 });
+    res.json(feedbacks);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch feedback' });
+  }
+});
+
 /* ─────────────── FRONTEND ─────────────── */
 app.use(express.static(path.join(__dirname, '../frontend')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, '../frontend/index.html')));
