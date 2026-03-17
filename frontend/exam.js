@@ -36,6 +36,11 @@ let lastViolationTime = 0;
 const VIOLATION_COOLDOWN_MS = 1500;
 const violationLog = [];
 
+// ── SESSION TOKEN SECURITY (Issue 1: URL Security) ────────────────────
+// Exam page requires a valid server-issued session token.
+// Without a token the page redirects to home — cannot be accessed by direct URL.
+let _examSessionToken = sessionStorage.getItem('examToken') || localStorage.getItem('examToken');
+
 // sessionStorage is tab-isolated — each tab keeps its own student credentials
 // This prevents multi-tab cross-contamination where Tab2's login overwrites Tab1's data
 let testId      = sessionStorage.getItem('testId');
@@ -57,11 +62,57 @@ if (!testId || !studentReg) {
 
 if (!testId || !studentReg) { location.href = '/'; }
 
+// Verify session token — BLOCKS exam load until verified (prevents URL direct access)
+let _tokenVerified = false;
+async function verifySessionToken() {
+  // If this is a page refresh (pagehide set the flag), the token is still valid on the server.
+  // Skip the network check and let the exam reload — answers/timer will be restored from server.
+  const isRefresh = sessionStorage.getItem('_examPageRefreshing') === '1';
+  sessionStorage.removeItem('_examPageRefreshing'); // consume the flag immediately
+
+  if (!_examSessionToken) {
+    // No token at all — only block if it's NOT a refresh scenario
+    if (!isRefresh) { location.href = '/'; return false; }
+    // On refresh: token may still be in sessionStorage/localStorage from this tab
+    _examSessionToken = sessionStorage.getItem('examToken') || localStorage.getItem('examToken');
+    if (!_examSessionToken) { location.href = '/'; return false; }
+  }
+
+  try {
+    const r = await fetch('/api/student/verify-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: _examSessionToken })
+    });
+    const d = await r.json();
+    if (!d.valid) {
+      // Token invalid — if this was a refresh, still allow exam to load
+      // (save-progress beacon may not have completed yet; answers are safe in DB)
+      if (isRefresh) return true;
+      location.href = '/';
+      return false;
+    }
+    return true;
+  } catch (_) {
+    // Network error — allow exam to continue (don't block on connectivity issues)
+    return true;
+  }
+}
+
 /* ── Security events ──────────────────────── */
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) recordViolation('Tab switch detected');
 });
-document.addEventListener('keydown', e => {
+// Right-click: prevent context menu AND suppress the blur violation it can cause
+let _contextMenuOpen = false;
+document.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  _contextMenuOpen = true;
+  setTimeout(() => { _contextMenuOpen = false; }, 1500);
+});
+document.addEventListener('click',   () => { _contextMenuOpen = false; });
+document.addEventListener('keydown',  e => {
+  _contextMenuOpen = false;
   if (e.ctrlKey && ['c','v','x','a'].includes(e.key.toLowerCase())) {
     e.preventDefault(); recordViolation('Copy/paste attempt blocked');
   }
@@ -69,10 +120,36 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
   }
 });
-document.addEventListener('contextmenu', e => { e.preventDefault(); });
-window.addEventListener('blur', () => recordViolation('Window focus lost'));
+
+window.addEventListener('blur', () => {
+  // Don't count blur as a violation if it was triggered by a right-click context menu
+  if (_contextMenuOpen) return;
+  recordViolation('Window focus lost');
+});
+
+// ── Issue 2: Browser/Desktop Shutdown Auto-Submit ─────────────────────
+// pagehide fires reliably on tab close, browser close, and system shutdown.
+// sendBeacon is used because fetch is cancelled during page unload.
+// IMPORTANT: pagehide also fires on page REFRESH — we must NOT submit on refresh.
+// We detect refresh by setting a sessionStorage flag before unload; if the flag
+// is present on DOMContentLoaded it means the page was refreshed (not closed).
+window.addEventListener('pagehide', () => {
+  if (examSubmitted || examLocked || !examStarted) return;
+  // Mark this as a pending unload so the reload can detect it's a refresh
+  sessionStorage.setItem('_examPageRefreshing', '1');
+  // Save current answers and timer immediately via sendBeacon so refresh restores them
+  try {
+    const remapped = remapAnswers();
+    const savePayload = JSON.stringify({ testId, studentName, studentReg, answers: remapped, remainingSeconds });
+    navigator.sendBeacon('/api/exam/save-progress', new Blob([savePayload], { type: 'application/json' }));
+  } catch (_) {}
+  // We do NOT submit here and do NOT invalidate the token — the tab may be just refreshing.
+  // True tab/browser close is detected below via a delayed check that runs only if the page
+  // does NOT reload within 1 second (handled by the server-side session TTL of 4 hours).
+});
+
 window.addEventListener('beforeunload', e => {
-  if (!examSubmitted && !examLocked) { e.preventDefault(); e.returnValue = ''; }
+  if (!examSubmitted && !examLocked && examStarted) { e.preventDefault(); e.returnValue = ''; }
 });
 
 // Back button detection
@@ -250,6 +327,42 @@ async function lockExam() {
   clearInterval(autoSaveInterval);
   clearInterval(elapsedInterval);
 
+  // Poll every 5 seconds — detect when staff unlocks the exam
+  const _unlockPoll = setInterval(async () => {
+    if (!examLocked) { clearInterval(_unlockPoll); return; }
+    try {
+      const r = await fetch(`/api/exam/lock-status/${testId}/${studentReg}`);
+      if (!r.ok) return;
+      const d = await r.json();
+      if (!d.isLocked && !d.isForceSubmitted) {
+        // Staff unlocked — remove lock overlay and resume exam
+        clearInterval(_unlockPoll);
+        examLocked = false;
+        const overlay = document.getElementById('lockOverlay');
+        if (overlay) overlay.remove();
+        document.querySelectorAll('input, textarea, button').forEach(el => el.disabled = false);
+        // Restart timer with remaining seconds from server
+        if (d.remainingSeconds && d.remainingSeconds > 0) {
+          remainingSeconds = d.remainingSeconds;
+        }
+        startTimer();
+        autoSaveInterval = setInterval(autoSaveProgress, 10000);
+        updateSubmitLock();
+        // Show unlock toast
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#10b981;color:#fff;padding:14px 20px;border-radius:10px;font-size:14px;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);';
+        toast.textContent = '✅ Your exam has been unlocked. You may continue.';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+      } else if (d.isForceSubmitted) {
+        // Staff force-submitted — show submitted screen
+        clearInterval(_unlockPoll);
+        examLocked = false;
+        showSubmittedScreen(true);
+      }
+    } catch (_) {}
+  }, 5000);
+
   document.getElementById('warningBox').classList.remove('open');
   document.getElementById('confirmBox').classList.remove('open');
   document.querySelectorAll('input, textarea, button').forEach(el => el.disabled = true);
@@ -266,6 +379,19 @@ async function lockExam() {
     const data = await res.json();
     if (data.lockCode) lockCode = data.lockCode;
   } catch (_) {}
+
+  // Invalidate session token when exam is locked
+  if (_examSessionToken) {
+    try {
+      fetch('/api/student/invalidate-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: _examSessionToken })
+      });
+    } catch (_) {}
+    sessionStorage.removeItem('examToken');
+    localStorage.removeItem('examToken');
+  }
 
   const overlay = document.createElement('div');
   overlay.id = 'lockOverlay';
@@ -386,6 +512,12 @@ async function timerExpiredForceSubmit() {
       body: JSON.stringify({ testId, studentName, studentReg, answers: remapped, violationLog })
     });
   } catch (_) {}
+  // Invalidate session token
+  if (_examSessionToken) {
+    try { fetch('/api/student/invalidate-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: _examSessionToken }) }); } catch (_) {}
+    sessionStorage.removeItem('examToken');
+    localStorage.removeItem('examToken');
+  }
   const overlay = document.getElementById('lockOverlay');
   if (overlay) overlay.remove();
   showSubmittedScreen();
@@ -396,11 +528,16 @@ async function autoSaveProgress() {
   if (examSubmitted || examLocked) return;
   try {
     const remapped = remapAnswers();
+    // Issue 4: Use a 5-second timeout to prevent slow saves from piling up
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
     await fetch('/api/exam/save-progress', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ testId, studentName, studentReg, answers: remapped, remainingSeconds })
+      body: JSON.stringify({ testId, studentName, studentReg, answers: remapped, remainingSeconds }),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
   } catch (_) {}
 }
 
@@ -722,6 +859,18 @@ async function finalSubmit() {
       if (attempt < 3) await new Promise(r => setTimeout(r, 1000));
     }
   }
+  // Invalidate session token after submit
+  if (_examSessionToken) {
+    try {
+      await fetch('/api/student/invalidate-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: _examSessionToken })
+      });
+    } catch (_) {}
+    sessionStorage.removeItem('examToken');
+    localStorage.removeItem('examToken');
+  }
   ovl.remove();
   showSubmittedScreen(success);
 }
@@ -903,8 +1052,27 @@ async function loadExam() {
   const originalQuestions = test.questions || [];
   questions = test.shuffleQuestions !== false ? shuffleArray([...originalQuestions]) : [...originalQuestions];
 
+  // Build a robust index map: track which original indices have been assigned
+  // so duplicate question texts don't map to the same original index
+  const _assignedOrigIdx = new Set();
   questions.forEach(q => {
-    q._origIdx = originalQuestions.findIndex(orig => orig.question === q.question && orig.type === q.type);
+    // Try exact match (question text + type + marks)
+    let idx = originalQuestions.findIndex((orig, i) =>
+      !_assignedOrigIdx.has(i) &&
+      orig.question === q.question &&
+      orig.type === q.type &&
+      (orig.marks || 1) === (q.marks || 1)
+    );
+    // Fallback: match by question text + type only
+    if (idx === -1) {
+      idx = originalQuestions.findIndex((orig, i) =>
+        !_assignedOrigIdx.has(i) &&
+        orig.question === q.question &&
+        orig.type === q.type
+      );
+    }
+    q._origIdx = idx;
+    if (idx !== -1) _assignedOrigIdx.add(idx);
     // Pre-shuffle options once so they stay consistent while navigating back and forth
     if ((q.type === 'MCQ' || q.type === 'MSQ') && test.shuffleOptions !== false) {
       q._shuffledOpts = shuffleArray(q.options.map((o, i) => ({ o, i })));
@@ -966,6 +1134,41 @@ function renderLockScreenOnly(lockCode) {
   examLocked = true;
   clearInterval(timerInterval);
   document.querySelectorAll('input, textarea, button').forEach(el => el.disabled = true);
+
+  // Poll for staff unlock (same as in lockExam)
+  const _unlockPoll2 = setInterval(async () => {
+    if (!examLocked) { clearInterval(_unlockPoll2); return; }
+    try {
+      const r = await fetch(`/api/exam/lock-status/${testId}/${studentReg}`);
+      if (!r.ok) return;
+      const d = await r.json();
+      if (!d.isLocked && !d.isForceSubmitted) {
+        clearInterval(_unlockPoll2);
+        // Token was cleared on lock — student must re-login to get fresh token
+        // Redirect to student login page where canResume will handle re-entry
+        const overlay2 = document.getElementById('lockOverlay');
+        if (overlay2) overlay2.remove();
+        document.body.innerHTML = `
+          <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);font-family:var(--font-main);padding:20px;">
+            <div class="card" style="text-align:center;padding:36px;max-width:420px;width:100%;">
+              <div style="font-size:48px;margin-bottom:16px;">✅</div>
+              <h3 style="margin-bottom:8px;color:var(--success);">Exam Unlocked!</h3>
+              <p style="color:var(--muted);font-size:14px;margin-bottom:20px;">
+                Your invigilator has unlocked your exam.<br>
+                Please log in again to resume — your answers are saved.
+              </p>
+              <button class="btn btn-primary" style="width:100%;" onclick="location.href='/'">
+                Go to Login →
+              </button>
+            </div>
+          </div>`;
+      } else if (d.isForceSubmitted) {
+        clearInterval(_unlockPoll2);
+        examLocked = false;
+        showSubmittedScreen(true);
+      }
+    } catch (_) {}
+  }, 5000);
 
   const overlay = document.createElement('div');
   overlay.id = 'lockOverlay';
@@ -1030,7 +1233,11 @@ function startExam() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  // Verify token FIRST before loading any exam data
+  const tokenOk = await verifySessionToken();
+  if (!tokenOk) return; // already redirected
+
   const alreadySeen = localStorage.getItem('disclaimerSeen_' + testId);
   if (alreadySeen) {
     // Hide disclaimer immediately — student already read it

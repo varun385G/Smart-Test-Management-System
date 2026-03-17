@@ -15,7 +15,7 @@ async function loadAdminResults() {
   `;
 
   try {
-    const res = await fetch("/api/admin/results/grouped");
+    const res = await fetch('/api/admin/results/grouped');
     if (!res.ok) throw new Error("Failed to load admin results");
 
     const data = await res.json();

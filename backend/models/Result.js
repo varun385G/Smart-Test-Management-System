@@ -32,4 +32,8 @@ const resultSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Compound index for fast lookups and upserts on (testId + studentReg)
+// Fixes Issue 4: slow auto-saving due to full collection scans
+resultSchema.index({ testId: 1, studentReg: 1 }, { unique: true });
+
 module.exports = mongoose.model("Result", resultSchema);

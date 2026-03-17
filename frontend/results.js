@@ -2,6 +2,7 @@
 let currentTestId    = null;
 let currentTestTitle = 'Results';
 let currentResults   = [];
+const staffId        = sessionStorage.getItem('staffId') || '';
 
 /* ── load ───────────────────────────────── */
 async function loadResults() {
@@ -9,7 +10,7 @@ async function loadResults() {
   const tbody = document.getElementById('results');
   if (!tbody) return;
 
-  tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--muted);">Loading results...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--muted);">Loading results...</td></tr>`;
 
   try {
     // Use staff endpoint — no publish gate, staff always see results
@@ -31,7 +32,7 @@ async function loadResults() {
     } catch (_) {}
 
     if (!data.length) {
-      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--muted);">No attempts yet</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--muted);">No attempts yet</td></tr>`;
       return;
     }
 
@@ -59,6 +60,12 @@ async function loadResults() {
         <td>${r.studentName}<br><span style="font-size:11px; color:var(--muted);">${r.studentReg}</span></td>
         <td style="text-align:center; font-weight:700; color:var(--primary);">${rankDisplay}</td>
         <td>${r.score} / ${r.total} <span style="color:var(--muted); font-size:12px;">(${pct}%)</span> ${lockedBadge} ${violationsBadge}</td>
+        <td style="text-align:center;">
+          <button class="btn" style="font-size:11px; padding:4px 10px; color:#dc2626; border-color:#fecaca; background:#fff5f5;"
+            onclick="deleteAttempt('${currentTestId}','${r.studentReg}','${r.studentName}', this)">
+            🗑 Delete
+          </button>
+        </td>
       `;
       tbody.appendChild(row);
     });
@@ -69,7 +76,7 @@ async function loadResults() {
     loadAnalytics();
 
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#dc2626;">Error loading results</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#dc2626;">Error loading results</td></tr>`;
   }
 }
 
@@ -219,3 +226,41 @@ document.addEventListener('click', e => {
     if (dd) dd.style.display = 'none';
   }
 });
+/* ── Issue 3: Staff Delete Student Attempt ──────────────────────────── */
+async function deleteAttempt(testId, studentReg, studentName, btn) {
+  const confirmed = confirm(
+    `Delete attempt for "${studentName}" (${studentReg})?\n\n` +
+    `This will permanently remove their result and allow them to re-attempt using the same Registration ID.`
+  );
+  if (!confirmed) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+
+  try {
+    const res = await fetch(`/api/results/${testId}/${encodeURIComponent(studentReg)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffId: staffId })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      // Remove the row from the table
+      btn.closest('tr').remove();
+      // Show a brief success notice
+      const notice = document.createElement('div');
+      notice.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#10b981;color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.15);';
+      notice.textContent = `✅ ${studentName}'s attempt deleted. They can now re-attempt.`;
+      document.body.appendChild(notice);
+      setTimeout(() => notice.remove(), 4000);
+    } else {
+      alert(data.message || 'Failed to delete attempt.');
+      btn.disabled = false;
+      btn.textContent = '🗑 Delete';
+    }
+  } catch (err) {
+    alert('Network error. Please try again.');
+    btn.disabled = false;
+    btn.textContent = '🗑 Delete';
+  }
+}

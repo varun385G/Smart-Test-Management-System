@@ -2,6 +2,10 @@
    CREATE / EDIT TEST — Full featured
    ═══════════════════════════════════════════ */
 
+// Auth guard — must be logged in as staff
+const staffId = sessionStorage.getItem('staffId');
+if (!staffId) { location.href = '/'; throw new Error('Not logged in'); }
+
 let questionList = [];   // [{id, type, ...}]
 let nextId = 1;
 let isDirty = false;
@@ -22,8 +26,8 @@ window.addEventListener('DOMContentLoaded', () => {
     restoreDraft();
   }
 
-  // Auto-save draft every 30s
-  setInterval(saveDraft, 30000);
+  // Auto-save draft every 30s (store handle so we can clear it after save)
+  window._draftInterval = setInterval(saveDraft, 30000);
 
   // Unsaved warning
   window.addEventListener('beforeunload', e => {
@@ -494,8 +498,8 @@ function extractQuestion(id) {
     const radios    = card.querySelectorAll(`#optlist-${id} input[type="radio"]`);
     const opts      = [...optInputs].map(o => o.value.trim());
     const correctIndex = [...radios].findIndex(r => r.checked);
-    if (opts.some(o => !o)) throw `Q${getQNum(id)}: Fill all MCQ option texts`;
-    if (correctIndex === -1) throw `Q${getQNum(id)}: Select the correct MCQ answer`;
+    if (opts.some(o => !o)) throw new Error(`Q${getQNum(id)}: Fill all MCQ option texts`);
+    if (correctIndex === -1) throw new Error(`Q${getQNum(id)}: Select the correct MCQ answer`);
     qObj.options = opts;
     qObj.correctIndex = correctIndex;
 
@@ -504,18 +508,18 @@ function extractQuestion(id) {
     const checks    = card.querySelectorAll(`#optlist-${id} input[type="checkbox"]`);
     const opts      = [...optInputs].map(o => o.value.trim());
     const correctIdxs = [...checks].map((c,i) => c.checked ? i : -1).filter(i => i !== -1);
-    if (opts.some(o => !o)) throw `Q${getQNum(id)}: Fill all MSQ option texts`;
-    if (correctIdxs.length === 0) throw `Q${getQNum(id)}: Select at least one correct MSQ answer`;
+    if (opts.some(o => !o)) throw new Error(`Q${getQNum(id)}: Fill all MSQ option texts`);
+    if (correctIdxs.length === 0) throw new Error(`Q${getQNum(id)}: Select at least one correct MSQ answer`);
     qObj.options = opts;
     qObj.correctIndexes = correctIdxs;
 
   } else if (type === 'NAT') {
     const val = card.querySelector('.nat-answer')?.value;
-    if (val === '' || val === null || val === undefined) throw `Q${getQNum(id)}: Enter numeric answer`;
+    if (val === '' || val === null || val === undefined) throw new Error(`Q${getQNum(id)}: Enter numeric answer`);
     qObj.correctValue = Number(val);
   }
 
-  if (!questionText) throw `Q${getQNum(id)}: Question text is required`;
+  if (!questionText) throw new Error(`Q${getQNum(id)}: Question text is required`);
   return qObj;
 }
 
@@ -525,9 +529,9 @@ function collectFormData(validate = true) {
   const duration = Number(document.getElementById('duration').value);
 
   if (validate) {
-    if (!title)    throw 'Test title is required';
-    if (!password) throw 'Test password is required';
-    if (!duration) throw 'Duration is required';
+    if (!title)    throw new Error('Test title is required');
+    if (!password) throw new Error('Test password is required');
+    if (!duration) throw new Error('Duration is required');
   }
 
   const cards = [...document.querySelectorAll('.question-card')];
@@ -557,7 +561,7 @@ function collectFormData(validate = true) {
 /* ── Preview ──────────────────────────────── */
 function previewTest() {
   let data;
-  try { data = collectFormData(false); } catch (e) { showToast(e, 'warn'); return; }
+  try { data = collectFormData(false); } catch (e) { showToast(e instanceof Error ? e.message : String(e), 'warn'); return; }
 
   const modal = document.getElementById('previewModal');
   const content = document.getElementById('previewContent');
@@ -607,7 +611,6 @@ async function saveTest() {
 
   try {
     const data = collectFormData(true);
-    const staffId = sessionStorage.getItem('staffId');
 
     let url, method;
     if (editingTestId) {
@@ -625,10 +628,11 @@ async function saveTest() {
     });
 
     const json = await res.json();
-    if (!res.ok) throw json.message || 'Failed to save';
+    if (!res.ok) throw new Error(json.message || 'Failed to save');
 
     isDirty = false;
     clearDraft();
+    if (window._draftInterval) { clearInterval(window._draftInterval); window._draftInterval = null; }
 
     if (editingTestId) {
       showToast('Test updated successfully!', 'success');
@@ -640,7 +644,7 @@ async function saveTest() {
     }
 
   } catch (err) {
-    showToast(String(err), 'error');
+    showToast(err instanceof Error ? err.message : String(err), 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = orig;
@@ -689,7 +693,6 @@ async function openBankModal() {
   document.getElementById('bankQuestionList').innerHTML = '';
   document.getElementById('bankQuestionsSection').style.display = 'none';
 
-  const staffId = sessionStorage.getItem('staffId');
   try {
     const res = await fetch(`/api/tests/by-staff/${staffId}`);
     bankTestList = await res.json();

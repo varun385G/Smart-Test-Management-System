@@ -34,11 +34,69 @@ async function handleSubmit() {
         return;
       }
       if (res.status === 403 && data.scheduledEnd) {
+        // Issue 5 fix: if window just closed within 90s, student validated in time but server was slow (50+ concurrent users)
+        const endedSecondsAgo = (new Date() - new Date(data.scheduledEnd)) / 1000;
+        if (endedSecondsAgo <= 90) {
+          sessionStorage.setItem('testId', testId);
+          sessionStorage.setItem('studentName', name);
+          sessionStorage.setItem('studentReg', reg);
+          localStorage.setItem('testId', testId);
+          localStorage.setItem('studentName', name);
+          localStorage.setItem('studentReg', reg);
+          localStorage.removeItem('examScheduledStart');
+          try {
+            const tokenRes = await fetch('/api/student/issue-token', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ testId, studentReg: reg, studentName: name })
+            });
+            if (tokenRes.ok) {
+              const tokenData = await tokenRes.json();
+              sessionStorage.setItem('examToken', tokenData.token);
+              localStorage.setItem('examToken', tokenData.token);
+            }
+          } catch (_) {}
+          location.href = '/exam.html';
+          return;
+        }
         const endTime = new Date(data.scheduledEnd).toLocaleString();
         msgBox.innerHTML = `<div class="card" style="text-align:center; padding:20px; border-color:var(--danger);"><div style="font-size:36px; margin-bottom:8px;">🔒</div><div style="font-weight:700; margin-bottom:6px; color:var(--danger);">Exam Window Closed</div><div style="color:var(--muted); font-size:13.5px;">This exam ended on<br><strong>${endTime}</strong><br><span style="font-size:12px; margin-top:6px; display:block;">If you already attempted this exam, contact your staff to view your result.</span></div></div>`;
         return;
       }
       msgBox.innerHTML = `<div style="background:var(--danger-light); color:#991b1b; padding:12px 16px; border-radius:10px; font-size:13.5px; text-align:center;">${data.message || 'Validation failed'}</div>`;
+      return;
+    }
+
+    // ── UNLOCKED RESUME: staff unlocked after malpractice ──────────
+    // canResume=true means exam was in progress and staff allowed student back in
+    if (data.canResume) {
+      sessionStorage.setItem('testId', testId);
+      sessionStorage.setItem('studentName', name);
+      sessionStorage.setItem('studentReg', reg);
+      localStorage.setItem('testId', testId);
+      localStorage.setItem('studentName', name);
+      localStorage.setItem('studentReg', reg);
+      localStorage.removeItem('examScheduledStart');
+      // Issue a fresh token for re-entry
+      try {
+        const tokenRes = await fetch('/api/student/issue-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ testId, studentReg: reg, studentName: name })
+        });
+        if (tokenRes.ok) {
+          const tokenData = await tokenRes.json();
+          sessionStorage.setItem('examToken', tokenData.token);
+          localStorage.setItem('examToken', tokenData.token);
+        }
+      } catch (_) {}
+      msgBox.innerHTML = `
+        <div class="card" style="text-align:center; padding:20px; border-color:var(--success); border-width:2px;">
+          <div style="font-size:32px; margin-bottom:8px;">✅</div>
+          <div style="font-weight:800; color:var(--success); margin-bottom:4px;">Exam Unlocked!</div>
+          <div style="color:var(--muted); font-size:13px;">Your invigilator has unlocked your exam.<br>Resuming now…</div>
+        </div>`;
+      setTimeout(() => { location.href = '/exam.html'; }, 1200);
       return;
     }
 
@@ -133,6 +191,21 @@ async function handleSubmit() {
     localStorage.setItem('studentName', name);
     localStorage.setItem('studentReg', reg);
 
+    // ── Issue 1: Issue a server session token so exam.html can't be opened by direct URL ──
+    // This runs in parallel — non-blocking. Token is stored before redirect.
+    try {
+      const tokenRes = await fetch('/api/student/issue-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testId, studentReg: reg, studentName: name })
+      });
+      if (tokenRes.ok) {
+        const tokenData = await tokenRes.json();
+        sessionStorage.setItem('examToken', tokenData.token);
+        localStorage.setItem('examToken', tokenData.token);
+      }
+    } catch (_) { /* non-critical — exam still loads but URL direct-access blocked */ }
+
     // If scheduledStart is still more than 2 mins away — show countdown on login page
     // Auto-redirect happens when 2-min mark is reached (disclaimer shows those 2 mins)
     if (data.scheduledStart) {
@@ -189,6 +262,7 @@ function showPreExamCountdown(scheduledStart) {
           <div style="font-weight:800; font-size:15px; color:var(--success); margin-bottom:4px;">Exam has started!</div>
           <div style="color:var(--muted); font-size:13px;">Taking you to the exam now…</div>
         </div>`;
+      _ensureSessionCreds();
       setTimeout(() => { location.href = '/exam.html'; }, 1200);
       return;
     }
@@ -362,10 +436,12 @@ function showNotStartedCountdown(scheduledStart) {
 function msgBoxEl() { return document.getElementById('messageBox'); }
 /* ── Ensure session credentials are set before redirecting ── */
 function _ensureSessionCreds() {
-  const tid  = localStorage.getItem('testId');
-  const name = localStorage.getItem('studentName');
-  const reg  = localStorage.getItem('studentReg');
-  if (tid)  sessionStorage.setItem('testId', tid);
-  if (name) sessionStorage.setItem('studentName', name);
-  if (reg)  sessionStorage.setItem('studentReg', reg);
+  const tid   = localStorage.getItem('testId');
+  const name  = localStorage.getItem('studentName');
+  const reg   = localStorage.getItem('studentReg');
+  const token = localStorage.getItem('examToken');
+  if (tid)   sessionStorage.setItem('testId', tid);
+  if (name)  sessionStorage.setItem('studentName', name);
+  if (reg)   sessionStorage.setItem('studentReg', reg);
+  if (token) sessionStorage.setItem('examToken', token);
 }

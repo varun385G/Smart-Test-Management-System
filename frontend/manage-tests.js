@@ -51,7 +51,7 @@ function renderTests(tests) {
       : `<button class="btn btn-primary btn-sm" onclick="publishResults('${t.testId}', this)">Publish</button>`;
 
     const lockedBadge = t.lockedCount > 0
-      ? `<span class="badge" style="background:#fee2e2; color:#dc2626; border:1px solid #fecaca; cursor:pointer;" onclick="openLockedPanel('${t.testId}', '${t.title}')">🔴 ${t.lockedCount} Locked</span>`
+      ? `<span class="badge" style="background:#fee2e2; color:#dc2626; border:1px solid #fecaca; cursor:pointer;" onclick="openLockedPanel('${t.testId}', decodeURIComponent('${encodeURIComponent(t.title)}'))">🔴 ${t.lockedCount} Locked</span>`
       : '';
 
     return `
@@ -66,7 +66,8 @@ function renderTests(tests) {
         <td>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <button class="btn btn-sm" onclick="viewResults('${t.testId}')">📊 Results</button>
-            <button class="btn btn-sm" onclick="viewFeedback('${t.testId}','${t.title.replace(/'/g,"\\'")}')" style="border-color:#a78bfa;color:#7c3aed;">💬 Feedback</button>
+            <button class="btn btn-sm" onclick="viewFeedback('${t.testId}',decodeURIComponent('${encodeURIComponent(t.title)}'))" style="border-color:#a78bfa;color:#7c3aed;">💬 Feedback</button>
+            <button class="btn btn-sm" onclick="downloadAnswerKey('${t.testId}',decodeURIComponent('${encodeURIComponent(t.title)}'))" style="border-color:#6ee7b7;color:#065f46;">🗝 Answer Key</button>
             <button class="btn btn-sm" onclick="editTest('${t.testId}')">✏️ Edit</button>
             ${publishBtn}
             <button class="btn btn-sm" style="border-color:#fecaca; color:var(--danger);" onclick="deleteTest('${t._id}')">🗑</button>
@@ -305,4 +306,230 @@ async function viewFeedback(testId, testTitle) {
   } catch {
     document.getElementById('_feedbackBody').innerHTML = '<div style="color:var(--danger); text-align:center; padding:16px;">Failed to load feedback.</div>';
   }
+}
+
+/* ─────────────── ANSWER KEY PDF ─────────────── */
+async function downloadAnswerKey(testId, testTitle) {
+  let test;
+  try {
+    const res = await fetch('/api/tests/' + testId);
+    if (!res.ok) throw new Error();
+    test = await res.json();
+  } catch {
+    showToast('Failed to load test data', 'error');
+    return;
+  }
+  if (!test.questions || !test.questions.length) {
+    showToast('This test has no questions', 'warn');
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210, M = 14, CW = W - M * 2;
+  const PAGE_H = 297, BOTTOM = PAGE_H - 16;
+  let y = 0;
+
+  const C = {
+    primary : [79,  70,  229],
+    success : [16,  185, 129],
+    danger  : [239, 68,  68 ],
+    warning : [245, 158, 11 ],
+    muted   : [100, 116, 139],
+    border  : [226, 232, 240],
+    bg      : [248, 250, 252],
+    white   : [255, 255, 255],
+    text    : [15,  23,  42 ],
+    successL: [209, 250, 229],
+    warningL: [254, 243, 199],
+    greenTxt: [6,   95,  70 ],
+    amberTxt: [120, 53,  15 ],
+    purple  : [109, 40,  217],
+    purpleL : [237, 233, 254],
+  };
+
+  function bgFill(x, ry, w, h, color) {
+    doc.setFillColor(...color); doc.rect(x, ry, w, h, 'F');
+  }
+  function stroke(x, ry, w, h, color, lw) {
+    doc.setDrawColor(...color); doc.setLineWidth(lw || 0.3); doc.rect(x, ry, w, h, 'S');
+  }
+  function roundFill(x, ry, w, h, color, strokeColor, r) {
+    doc.setFillColor(...color);
+    doc.setDrawColor(...(strokeColor || color));
+    doc.setLineWidth(0.5);
+    doc.roundedRect(x, ry, w, h, r || 2, r || 2, 'FD');
+  }
+
+  function ensureSpace(h) {
+    if (y + h > BOTTOM) {
+      doc.addPage(); bgFill(0, 0, W, PAGE_H, C.bg); y = 16;
+    }
+  }
+
+  function addFooters() {
+    const n = doc.internal.getNumberOfPages();
+    for (let p = 1; p <= n; p++) {
+      doc.setPage(p);
+      bgFill(0, PAGE_H - 10, W, 10, C.primary);
+      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.white);
+      doc.text('STMS — Answer Key  |  ' + (test.title || testId), M, PAGE_H - 3.5);
+      doc.text('Page ' + p + ' of ' + n, W - M, PAGE_H - 3.5, { align: 'right' });
+    }
+  }
+
+  // Page 1
+  bgFill(0, 0, W, PAGE_H, C.bg);
+  bgFill(0, 0, W, 36, C.primary);
+  doc.setFontSize(17); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.white);
+  doc.text('ANSWER KEY', W/2, 14, { align: 'center' });
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  doc.text(test.title || testId, W/2, 22, { align: 'center' });
+  doc.setFontSize(7.5);
+  doc.text('Test ID: ' + testId + '   |   Questions: ' + test.questions.length + '   |   Generated: ' + new Date().toLocaleDateString(), W/2, 29, { align: 'center' });
+  y = 42;
+
+  // Summary bar
+  const totalMarks = test.questions.reduce((s, q) => s + (Number(q.marks) || 1), 0);
+  const mcqC = test.questions.filter(q => q.type === 'MCQ').length;
+  const msqC = test.questions.filter(q => q.type === 'MSQ').length;
+  const natC = test.questions.filter(q => q.type === 'NAT').length;
+
+  bgFill(M, y, CW, 20, C.white);
+  stroke(M, y, CW, 20, C.border, 0.3);
+
+  [['Total Marks', totalMarks], ['MCQ', mcqC], ['MSQ', msqC], ['NAT', natC]].forEach(([lbl, val], i) => {
+    const iW = CW / 4, ix = M + i * iW + iW/2;
+    doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.muted);
+    doc.text(lbl, ix, y + 8, { align: 'center' });
+    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.primary);
+    doc.text(String(val), ix, y + 16, { align: 'center' });
+    if (i < 3) { doc.setDrawColor(...C.border); doc.setLineWidth(0.3); doc.line(M + (i+1)*iW, y+3, M + (i+1)*iW, y+17); }
+  });
+  y += 28;
+
+  // Section label
+  doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.muted);
+  doc.text('QUESTIONS & CORRECT ANSWERS', M, y);
+  y += 3;
+  doc.setDrawColor(...C.border); doc.setLineWidth(0.3); doc.line(M, y, M + CW, y);
+  y += 7;
+
+  // Questions
+  test.questions.forEach((q, qi) => {
+    const marks   = q.marks || 1;
+    const IX      = M + 7;
+    const ROW_W   = CW - 12;
+    const TXT_MRG = 3;
+    const LABEL_W = 42;
+    const OPT_W   = ROW_W - LABEL_W - TXT_MRG * 3;
+
+    // Measure
+    const qLines = doc.splitTextToSize(q.question || '', CW - 16);
+    let optH = 0;
+    if (q.type === 'MCQ' || q.type === 'MSQ') {
+      const ci = q.type === 'MCQ' ? [q.correctIndex] : (q.correctIndexes || []);
+      (q.options || []).forEach((opt, oi) => {
+        const isAns = ci.includes(oi);
+        const lines = doc.splitTextToSize(opt, isAns ? OPT_W : ROW_W - TXT_MRG * 2);
+        optH += Math.max(8, lines.length * 5 + 3) + 2;
+      });
+    } else {
+      optH += 10;
+    }
+    const expH = q.explanation ? (doc.splitTextToSize(q.explanation, CW - 20).length * 5 + 8) : 0;
+    const cardH = 16 + qLines.length * 5 + 2 + optH + expH + 5;
+
+    ensureSpace(cardH + 4);
+    const cTop = y;
+
+    bgFill(M, cTop, CW, cardH, C.white);
+    stroke(M, cTop, CW, cardH, C.border, 0.3);
+    bgFill(M, cTop, 3, cardH, C.success); // green accent bar
+
+    let hy = cTop + 8;
+
+    // Q header
+    doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.muted);
+    doc.text('Q' + (qi+1), IX, hy);
+
+    const typeFill = q.type === 'MCQ' ? [219,234,254] : q.type === 'MSQ' ? [237,233,254] : [254,243,199];
+    const typeTC   = q.type === 'MCQ' ? [37,99,235]   : q.type === 'MSQ' ? [109,40,217]  : [180,100,0];
+    roundFill(IX+13, hy-5.5, 15, 6.5, typeFill, typeTC, 3);
+    doc.setFontSize(6); doc.setFont('helvetica', 'bold'); doc.setTextColor(...typeTC);
+    doc.text(q.type, IX+20.5, hy-0.5, { align: 'center' });
+
+    roundFill(IX+30, hy-5.5, 22, 6.5, [241,245,249], C.border, 3);
+    doc.setFontSize(6); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.muted);
+    doc.text(marks + ' mark' + (marks !== 1 ? 's' : ''), IX+41, hy-0.5, { align: 'center' });
+
+    if (q.negativeMarkingEnabled && q.negativeMarks > 0) {
+      roundFill(IX+54, hy-5.5, 24, 6.5, [254,226,226], [239,68,68], 3);
+      doc.setFontSize(6); doc.setFont('helvetica', 'bold'); doc.setTextColor(200, 30, 30);
+      doc.text('-' + q.negativeMarks + ' wrong', IX+66, hy-0.5, { align: 'center' });
+    }
+
+    hy += 6;
+
+    // Question text
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.text);
+    doc.text(qLines, IX, hy);
+    hy += qLines.length * 5 + 3;
+
+    // Option rows
+    function drawAKRow(optText, isCorrect, labelTxt) {
+      const tw  = isCorrect ? OPT_W : ROW_W - TXT_MRG * 2;
+      const lns = doc.splitTextToSize(optText, tw);
+      const rh  = Math.max(8, lns.length * 5 + 3);
+      const rX  = IX - 1, rW = ROW_W;
+
+      if (isCorrect) {
+        bgFill(rX, hy-4, rW, rh, C.successL);
+      }
+      stroke(rX, hy-4, rW, rh, isCorrect ? C.success : C.border, isCorrect ? 0.6 : 0.25);
+
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', isCorrect ? 'bold' : 'normal');
+      doc.setTextColor(...(isCorrect ? C.greenTxt : C.text));
+      doc.text(lns, rX + TXT_MRG, hy);
+
+      if (isCorrect && labelTxt) {
+        const lW = LABEL_W - 2;
+        const lX = rX + rW - lW - TXT_MRG;
+        const lY = hy - 4 + (rh - 6) / 2;
+        roundFill(lX, lY, lW, 6, C.success, C.success, 3);
+        doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
+        doc.text(labelTxt, lX + lW/2, lY + 4.2, { align: 'center' });
+      }
+
+      hy += rh + 2;
+    }
+
+    if (q.type === 'MCQ') {
+      (q.options || []).forEach((opt, oi) => drawAKRow(opt, oi === q.correctIndex, 'CORRECT ANSWER'));
+    } else if (q.type === 'MSQ') {
+      const ci = q.correctIndexes || [];
+      (q.options || []).forEach((opt, oi) => drawAKRow(opt, ci.includes(oi), 'CORRECT'));
+    } else {
+      drawAKRow('Correct Answer:  ' + q.correctValue, true, 'CORRECT ANSWER');
+    }
+
+    if (q.explanation) {
+      const expLns = doc.splitTextToSize(q.explanation, CW - 20);
+      const eh = expLns.length * 5 + 5;
+      bgFill(IX-1, hy-3, ROW_W, eh, [255,251,235]);
+      stroke(IX-1, hy-3, ROW_W, eh, [253,230,138], 0.3);
+      doc.setFontSize(7.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(146, 64, 14);
+      doc.text(expLns, IX+1, hy+1);
+      hy += eh + 1;
+    }
+
+    y = hy + 5;
+  });
+
+  addFooters();
+
+  const sT = (test.title || testId).replace(/[^a-zA-Z0-9_-]/g, '_');
+  doc.save('AnswerKey_' + sT + '_' + testId + '.pdf');
+  showToast('Answer Key PDF downloaded!', 'success');
 }

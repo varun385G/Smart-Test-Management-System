@@ -18,24 +18,39 @@ app.use(express.json({ limit: '20mb' }));
 
 /* ─────────────── DATABASE ─────────────── */
 mongoose.connect(process.env.MONGO_URI, {
-  maxPoolSize: 10,              // stay within Atlas M0 connection limit
+  maxPoolSize: 10,
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
 })
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => { console.error('❌ MongoDB error:', err); process.exit(1); });
 
+/* ─────────────── SESSION MODEL ─────────────── */
+// Stored in MongoDB so tokens survive Render restarts / spin-down
+const sessionSchema = new mongoose.Schema({
+  token:       { type: String, required: true, unique: true, index: true },
+  testId:      String,
+  studentReg:  String,
+  studentName: { type: String, default: '' },
+  createdAt:   { type: Date, default: Date.now, expires: 14400 }
+});
+const Session = mongoose.models.Session || mongoose.model('Session', sessionSchema);
+
 /* ─────────────── HEALTH ─────────────── */
 app.get('/api/health', (req, res) => res.json({ status: 'API running' }));
 
 /* ─────────────── STAFF LOGIN ─────────────── */
 app.post('/api/staff/login', async (req, res) => {
-  const { email, password } = req.body;
-  const staff = await Staff.findOne({ email });
-  if (!staff) return res.status(404).json({ message: 'Staff not found' });
-  const match = await bcrypt.compare(password, staff.password);
-  if (!match) return res.status(401).json({ message: 'Invalid password' });
-  res.json({ staffId: staff._id, name: staff.name, role: staff.role });
+  try {
+    const { email, password } = req.body;
+    const staff = await Staff.findOne({ email });
+    if (!staff) return res.status(404).json({ message: 'Staff not found' });
+    const match = await bcrypt.compare(password, staff.password);
+    if (!match) return res.status(401).json({ message: 'Invalid password' });
+    res.json({ staffId: staff._id, name: staff.name, role: staff.role });
+  } catch (err) {
+    res.status(500).json({ message: 'Login failed' });
+  }
 });
 
 /* ─────────────── ADMIN: CREATE STAFF ─────────────── */
@@ -59,8 +74,19 @@ app.get('/api/admin/staff', async (req, res) => {
   res.json(staff);
 });
 app.delete('/api/admin/staff/:id', async (req, res) => {
-  await Staff.findByIdAndDelete(req.params.id);
-  res.json({ message: 'Staff deleted' });
+  try {
+    const staff = await Staff.findByIdAndDelete(req.params.id);
+    if (staff) {
+      const tests = await Test.find({ createdBy: req.params.id });
+      for (const t of tests) {
+        await Result.deleteMany({ testId: t.testId });
+      }
+      await Test.deleteMany({ createdBy: req.params.id });
+    }
+    res.json({ message: 'Staff deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete staff' });
+  }
 });
 
 /* ─────────────── ADMIN: RESET STAFF PASSWORD ─────────────── */
@@ -111,15 +137,20 @@ app.put('/api/staff/update-credentials', async (req, res) => {
 });
 
 /* ─────────────── CREATE TEST ─────────────── */
-function generateTestId() {
-  return 'ST-' + Math.floor(100000 + Math.random() * 900000);
+async function generateUniqueTestId() {
+  for (let i = 0; i < 10; i++) {
+    const id = 'ST-' + Math.floor(100000 + Math.random() * 900000);
+    const exists = await Test.findOne({ testId: id });
+    if (!exists) return id;
+  }
+  throw new Error('Could not generate unique test ID');
 }
 
 app.post('/api/tests/create', async (req, res) => {
   try {
     const { title, password, duration, questions, security, shuffleQuestions, shuffleOptions, staffId, scheduledStart, scheduledEnd, submitAfterMinutes } = req.body;
     const test = new Test({
-      testId: generateTestId(),
+      testId: await generateUniqueTestId(),
       title, password, duration,
       questions: questions || [],
       shuffleQuestions: shuffleQuestions !== false,
@@ -146,9 +177,9 @@ app.put('/api/tests/:testId/update', async (req, res) => {
     if (!test) return res.status(404).json({ message: 'Test not found' });
 
     const { title, password, duration, questions, security, shuffleQuestions, shuffleOptions, scheduledStart, scheduledEnd, submitAfterMinutes } = req.body;
-    if (title)    test.title    = title;
-    if (password) test.password = password;
-    if (duration) test.duration = Number(duration);
+    if (title    !== undefined) test.title    = title;
+    if (password !== undefined) test.password = password;
+    if (duration !== undefined && duration)  test.duration = Number(duration);
     if (questions)       test.questions        = questions;
     if (security)        test.security         = security;
     if (shuffleQuestions !== undefined) test.shuffleQuestions = shuffleQuestions;
@@ -170,7 +201,6 @@ app.get('/api/results/by-staff/:staffId', async (req, res) => {
   try {
     const tests = await Test.find({ createdBy: req.params.staffId });
     const testIds = tests.map(t => t.testId);
-    // Exclude results with total=0 to prevent divide-by-zero on the dashboard
     const results = await Result.find({ testId: { $in: testIds }, total: { $gt: 0 } });
     res.json(results);
   } catch (err) {
@@ -180,31 +210,39 @@ app.get('/api/results/by-staff/:staffId', async (req, res) => {
 
 /* ─────────────── TESTS BY STAFF ─────────────── */
 app.get('/api/tests/by-staff/:staffId', async (req, res) => {
-  const tests = await Test.find({ createdBy: req.params.staffId }).sort({ createdAt: -1 });
-  const enriched = await Promise.all(
-    tests.map(async t => {
-      const attempts = await Result.countDocuments({ testId: t.testId });
-      const locked   = await Result.countDocuments({ testId: t.testId, isLocked: true });
-      return {
-        _id: t._id,
-        testId: t.testId,
-        title: t.title,
-        resultsPublished: t.resultsPublished,
-        attempts,
-        lockedCount: locked,
-        scheduledStart: t.scheduledStart,
-        scheduledEnd:   t.scheduledEnd,
-      };
-    })
-  );
-  res.json(enriched);
+  try {
+    const tests = await Test.find({ createdBy: req.params.staffId }).sort({ createdAt: -1 });
+    const enriched = await Promise.all(
+      tests.map(async t => {
+        const attempts = await Result.countDocuments({ testId: t.testId });
+        const locked   = await Result.countDocuments({ testId: t.testId, isLocked: true });
+        return {
+          _id: t._id,
+          testId: t.testId,
+          title: t.title,
+          resultsPublished: t.resultsPublished,
+          attempts,
+          lockedCount: locked,
+          scheduledStart: t.scheduledStart,
+          scheduledEnd:   t.scheduledEnd,
+        };
+      })
+    );
+    res.json(enriched);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to load tests' });
+  }
 });
 
 /* ─────────────── FETCH TEST ─────────────── */
 app.get('/api/tests/:testId', async (req, res) => {
-  const test = await Test.findOne({ testId: req.params.testId });
-  if (!test) return res.status(404).json({ message: 'Test not found' });
-  res.json(test);
+  try {
+    const test = await Test.findOne({ testId: req.params.testId });
+    if (!test) return res.status(404).json({ message: 'Test not found' });
+    res.json(test);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch test' });
+  }
 });
 
 /* ─────────────── DELETE TEST ─────────────── */
@@ -223,22 +261,25 @@ app.delete('/api/tests/:id', async (req, res) => {
 
 /* ─────────────── PUBLISH RESULTS ─────────────── */
 app.post('/api/tests/:testId/publish-results', async (req, res) => {
-  const test = await Test.findOne({ testId: req.params.testId });
-  if (!test) return res.status(404).json({ message: 'Test not found' });
-  test.resultsPublished = true;
-  await test.save();
-  res.json({ message: 'Results published' });
+  try {
+    const test = await Test.findOne({ testId: req.params.testId });
+    if (!test) return res.status(404).json({ message: 'Test not found' });
+    test.resultsPublished = true;
+    await test.save();
+    res.json({ message: 'Results published' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to publish results' });
+  }
 });
 
 /* ─────────────── STUDENT VALIDATE ─────────────── */
 app.post('/api/student/validate', async (req, res) => {
+  try {
   const { testId, password, reg } = req.body;
   const test = await Test.findOne({ testId });
   if (!test) return res.status(404).json({ message: 'Test not found' });
   if (test.password !== password) return res.status(401).json({ message: 'Invalid password' });
 
-  // Check if student already attempted FIRST — returning students must always
-  // be able to see their result status even after the exam window has closed.
   const existing = await Result.findOne({ testId, studentReg: reg });
   if (existing) {
     if (existing.isLocked) {
@@ -250,6 +291,15 @@ app.post('/api/student/validate', async (req, res) => {
         resultsPublished: test.resultsPublished
       });
     }
+    const examInProgress = !existing.isForceSubmitted && (existing.score === 0 || existing.score === null || existing.score === undefined) && !existing.remainingSeconds;
+    const neverSubmitted = !existing.isForceSubmitted && (existing.total === 0 || existing.total === null || existing.total === undefined);
+    if (neverSubmitted || (examInProgress && existing.answers && existing.answers.length > 0)) {
+      return res.json({
+        attempted: false,
+        canResume: true,
+        scheduledStart: test.scheduledStart || null
+      });
+    }
     return res.json({
       attempted: true,
       isLocked: false,
@@ -258,11 +308,9 @@ app.post('/api/student/validate', async (req, res) => {
     });
   }
 
-  // Schedule window check — only block students who have NOT yet attempted
   const now = new Date();
   if (test.scheduledStart && now < test.scheduledStart) {
     const minsUntilStart = (new Date(test.scheduledStart) - now) / 60000;
-    // Allow entry within 7 minutes of start — frontend will show countdown
     if (minsUntilStart > 2) {
       return res.status(403).json({
         message: 'Exam has not started yet. Scheduled start: ' + new Date(test.scheduledStart).toLocaleString(),
@@ -270,7 +318,6 @@ app.post('/api/student/validate', async (req, res) => {
         minsUntilStart: Math.ceil(minsUntilStart)
       });
     }
-    // Within 7 mins — let them through with scheduledStart so frontend shows countdown
   }
   if (test.scheduledEnd && now > test.scheduledEnd) {
     return res.status(403).json({
@@ -279,11 +326,13 @@ app.post('/api/student/validate', async (req, res) => {
     });
   }
 
-  // Include scheduledStart so frontend knows to show countdown if exam hasn't started yet
   res.json({
     attempted: false,
     scheduledStart: test.scheduledStart || null
   });
+  } catch (err) {
+    res.status(500).json({ message: 'Validation failed. Please try again.' });
+  }
 });
 
 /* ─────────────── SCORING HELPER ─────────────── */
@@ -376,16 +425,18 @@ app.post('/api/exam/submit', async (req, res) => {
     const test = await Test.findOne({ testId });
     if (!test) return res.status(404).json({ message: 'Test not found' });
 
-    // Never overwrite a staff force-submit (e.g. timer expires after staff already force-submitted)
     const existing = await Result.findOne({ testId, studentReg });
     if (existing && existing.isForceSubmitted) {
       return res.json({ message: 'Already force-submitted', score: existing.score, total: existing.total });
+    }
+    // Block re-submission if already scored normally (total > 0 and not locked)
+    if (existing && !existing.isLocked && existing.total > 0) {
+      return res.json({ message: 'Already submitted', score: existing.score, total: existing.total });
     }
 
     const { score, breakdown } = calculateScore(test, answers);
     const total = parseFloat(test.questions.reduce((s, q) => s + (Number(q.marks) || 1), 0).toFixed(2));
 
-    // Upsert: handles both fresh submit and timer-expire-while-locked
     await Result.findOneAndUpdate(
       { testId, studentReg },
       {
@@ -450,13 +501,6 @@ app.post('/api/exam/save-progress', async (req, res) => {
   try {
     const { testId, studentName, studentReg, answers, remainingSeconds } = req.body;
 
-    // Check first so we never overwrite a force-submitted result
-    const existing = await Result.findOne({ testId, studentReg });
-    if (existing && existing.isForceSubmitted) {
-      return res.json({ message: 'Already submitted' });
-    }
-
-    // Upsert — works for fresh students who haven't locked/submitted yet
     const updateData = {
       answers: (answers || []).map(a => Array.isArray(a) ? [...a] : a),
     };
@@ -465,14 +509,21 @@ app.post('/api/exam/save-progress', async (req, res) => {
       updateData.remainingSeconds = remainingSeconds;
     }
 
-    await Result.findOneAndUpdate(
-      { testId, studentReg },
+    const result = await Result.findOneAndUpdate(
+      { testId, studentReg, isForceSubmitted: { $ne: true } },
       { $set: updateData },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
+    if (!result) {
+      return res.json({ message: 'Already submitted' });
+    }
+
     res.json({ message: 'Progress saved' });
   } catch (err) {
+    if (err.code === 11000) {
+      return res.json({ message: 'Already submitted' });
+    }
     console.error('SAVE PROGRESS ERROR:', err);
     res.status(500).json({ message: 'Save failed' });
   }
@@ -547,7 +598,7 @@ app.post('/api/exam/unlock', async (req, res) => {
   }
 });
 
-/* ─────────────── STAFF VIEW RESULTS (staff use — no publish gate) ─────────────── */
+/* ─────────────── STAFF VIEW RESULTS ─────────────── */
 app.get('/api/results/staff/:testId', async (req, res) => {
   try {
     const test = await Test.findOne({ testId: req.params.testId });
@@ -613,56 +664,64 @@ app.get('/api/results/analytics/:testId', async (req, res) => {
 
 /* ─────────────── STUDENT RESULT (published + rank) ─────────────── */
 app.get('/api/student/result/:testId/:reg', async (req, res) => {
-  const test = await Test.findOne({ testId: req.params.testId });
-  if (!test || !test.resultsPublished) return res.status(403).json({ message: 'Results not available' });
-  const result = await Result.findOne({ testId: req.params.testId, studentReg: req.params.reg });
-  if (!result) return res.status(404).json({ message: 'Result not found' });
-
-  const allResults = await Result.find({ testId: req.params.testId, isLocked: false }).sort({ score: -1 });
-  const rank = allResults.findIndex(r => r.studentReg === req.params.reg) + 1;
-  const totalStudents = allResults.length;
-
-  const obj = result.toObject();
-  obj.rank = rank;
-  obj.totalStudents = totalStudents;
-  res.json(obj);
+  try {
+    const test = await Test.findOne({ testId: req.params.testId });
+    if (!test || !test.resultsPublished) return res.status(403).json({ message: 'Results not available' });
+    const result = await Result.findOne({ testId: req.params.testId, studentReg: req.params.reg });
+    if (!result) return res.status(404).json({ message: 'Result not found' });
+    const allResults = await Result.find({ testId: req.params.testId, isLocked: false }).sort({ score: -1 });
+    const rank = allResults.findIndex(r => r.studentReg === req.params.reg) + 1;
+    const totalStudents = allResults.length;
+    const obj = result.toObject();
+    obj.rank = rank;
+    obj.totalStudents = totalStudents;
+    res.json(obj);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to load result' });
+  }
 });
 
-/* ─────────────── STUDENT RESULTS (published gate — for student-facing list) ─────────────── */
+/* ─────────────── STUDENT RESULTS (published gate) ─────────────── */
 app.get('/api/results/:testId', async (req, res) => {
-  const test = await Test.findOne({ testId: req.params.testId });
-  if (!test) return res.status(404).json({ message: 'Test not found' });
-  if (!test.resultsPublished) return res.status(403).json({ message: 'Results not published' });
-  const results = await Result.find({ testId: req.params.testId });
-  res.json(results);
+  try {
+    const test = await Test.findOne({ testId: req.params.testId });
+    if (!test) return res.status(404).json({ message: 'Test not found' });
+    if (!test.resultsPublished) return res.status(403).json({ message: 'Results not published' });
+    const results = await Result.find({ testId: req.params.testId });
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch results' });
+  }
 });
 
 /* ─────────────── ADMIN RESULTS GROUPED ─────────────── */
 app.get('/api/admin/results/grouped', async (req, res) => {
-  const staffList = await Staff.find({ role: 'staff' });
-  const tests     = await Test.find().populate('createdBy');
-  const results   = await Result.find();
-  const grouped   = {};
-
-  staffList.forEach(s => {
-    grouped[s._id.toString()] = { staffName: s.name, tests: {} };
-  });
-  tests.forEach(t => {
-    if (!t.createdBy || !grouped[t.createdBy._id.toString()]) return;
-    grouped[t.createdBy._id.toString()].tests[t.testId] = {
-      testTitle: t.title, resultsPublished: t.resultsPublished, results: []
-    };
-  });
-  results.forEach(r => {
-    Object.values(grouped).forEach(s => {
-      if (s.tests[r.testId]) s.tests[r.testId].results.push(r);
+  try {
+    const staffList = await Staff.find({ role: 'staff' });
+    const tests     = await Test.find().populate('createdBy');
+    const results   = await Result.find();
+    const grouped   = {};
+    staffList.forEach(s => {
+      grouped[s._id.toString()] = { staffName: s.name, tests: {} };
     });
-  });
-  res.json(grouped);
+    tests.forEach(t => {
+      if (!t.createdBy || !grouped[t.createdBy._id.toString()]) return;
+      grouped[t.createdBy._id.toString()].tests[t.testId] = {
+        testTitle: t.title, resultsPublished: t.resultsPublished, results: []
+      };
+    });
+    results.forEach(r => {
+      Object.values(grouped).forEach(s => {
+        if (s.tests[r.testId]) s.tests[r.testId].results.push(r);
+      });
+    });
+    res.json(grouped);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to load grouped results' });
+  }
 });
 
-
-/* ─────────────── SETUP SECURITY QUESTION (from dashboard) ─────────────── */
+/* ─────────────── SETUP SECURITY QUESTION ─────────────── */
 app.post('/api/staff/security-question/setup', async (req, res) => {
   try {
     const { staffId, currentPassword, securityQuestion, securityAnswer } = req.body;
@@ -676,7 +735,7 @@ app.post('/api/staff/security-question/setup', async (req, res) => {
     if (!match) return res.status(401).json({ message: 'Current password is incorrect' });
 
     staff.securityQuestion = securityQuestion.trim();
-    staff.securityAnswer   = securityAnswer.trim().toLowerCase(); // store lowercase for case-insensitive match
+    staff.securityAnswer   = securityAnswer.trim().toLowerCase();
     await staff.save();
     res.json({ message: 'Security question saved successfully' });
   } catch (err) {
@@ -684,7 +743,7 @@ app.post('/api/staff/security-question/setup', async (req, res) => {
   }
 });
 
-/* ─────────────── GET SECURITY QUESTION (for forgot password page) ─────────────── */
+/* ─────────────── GET SECURITY QUESTION ─────────────── */
 app.post('/api/staff/security-question/get', async (req, res) => {
   try {
     const { email } = req.body;
@@ -724,7 +783,7 @@ app.post('/api/staff/forgot-password', async (req, res) => {
   }
 });
 
-/* ─────────────── PUBLIC: STAFF NAME LOOKUP (used by exam page) ─────────────── */
+/* ─────────────── PUBLIC: STAFF NAME LOOKUP ─────────────── */
 app.get('/api/staff/name/:id', async (req, res) => {
   try {
     const staff = await Staff.findById(req.params.id, 'name');
@@ -734,6 +793,7 @@ app.get('/api/staff/name/:id', async (req, res) => {
     res.status(400).json({ name: null });
   }
 });
+
 /* ─────────────── QUESTION BANK ─────────────── */
 app.get('/api/question-bank/subjects', async (req, res) => {
   try {
@@ -782,7 +842,6 @@ app.delete('/api/question-bank/:id', async (req, res) => {
   }
 });
 
-
 /* ─────────────── FEEDBACK ─────────────── */
 const feedbackSchema = new (require('mongoose').Schema)({
   testId:      String,
@@ -816,6 +875,78 @@ app.get('/api/feedback/:testId', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch feedback' });
   }
 });
+
+/* ─────────────── SESSION TOKEN MANAGEMENT ─────────────── */
+// Stored in MongoDB so tokens survive Render restarts / spin-down
+
+app.post('/api/student/issue-token', async (req, res) => {
+  try {
+    const { testId, studentReg, studentName } = req.body;
+    if (!testId || !studentReg) return res.status(400).json({ message: 'Missing fields' });
+    const token = crypto.randomBytes(24).toString('hex');
+    await Session.create({ token, testId, studentReg, studentName: studentName || '' });
+    res.json({ token });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to issue token' });
+  }
+});
+
+app.post('/api/student/verify-token', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(401).json({ valid: false });
+    const session = await Session.findOne({ token });
+    if (!session) return res.status(401).json({ valid: false });
+    res.json({ valid: true, testId: session.testId, studentReg: session.studentReg, studentName: session.studentName });
+  } catch (err) {
+    res.json({ valid: true });
+  }
+});
+
+app.post('/api/student/invalidate-token', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (token) await Session.deleteOne({ token });
+    res.json({ message: 'Token invalidated' });
+  } catch (err) {
+    res.json({ message: 'Token invalidated' });
+  }
+});
+
+/* ─────────────── STAFF: DELETE STUDENT ATTEMPT ─────────────── */
+app.delete('/api/results/:testId/:studentReg', async (req, res) => {
+  try {
+    const { testId, studentReg } = req.params;
+    const { staffId } = req.body;
+
+    const test = await Test.findOne({ testId });
+    if (!test) return res.status(404).json({ message: 'Test not found' });
+    if (staffId && test.createdBy.toString() !== staffId) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    const deleted = await Result.findOneAndDelete({ testId, studentReg });
+    if (!deleted) return res.status(404).json({ message: 'Result not found' });
+    res.json({ message: 'Student attempt deleted. They can now re-attempt.' });
+  } catch (err) {
+    console.error('DELETE RESULT ERROR:', err);
+    res.status(500).json({ message: 'Failed to delete result' });
+  }
+});
+
+/* ─────────────── GLOBAL ERROR HANDLER ─────────────── */
+app.use((err, req, res, next) => {
+  console.error('UNHANDLED ERROR:', err);
+  res.status(500).json({ message: 'An unexpected error occurred. Please try again.' });
+});
+
+/* ─────────────── KEEP-ALIVE PING (Render free tier) ─────────────── */
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
+if (RENDER_EXTERNAL_URL) {
+  setInterval(() => {
+    fetch(RENDER_EXTERNAL_URL + '/api/health').catch(() => {});
+  }, 10 * 60 * 1000);
+}
 
 /* ─────────────── FRONTEND ─────────────── */
 app.use(express.static(path.join(__dirname, '../frontend')));
