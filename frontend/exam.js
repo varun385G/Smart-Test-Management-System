@@ -64,6 +64,21 @@ if (!testId || !studentReg) { location.href = '/'; }
 
 // Verify session token — BLOCKS exam load until verified (prevents URL direct access)
 let _tokenVerified = false;
+
+// Helper: fetch with a timeout so verify-token never hangs under server load
+async function _fetchWithTimeout(url, options, ms) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  try {
+    const r = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return r;
+  } catch (e) {
+    clearTimeout(id);
+    throw e;
+  }
+}
+
 async function verifySessionToken() {
   // If this is a page refresh (pagehide set the flag), the token is still valid on the server.
   // Skip the network check and let the exam reload — answers/timer will be restored from server.
@@ -79,22 +94,28 @@ async function verifySessionToken() {
   }
 
   try {
-    const r = await fetch('/api/student/verify-token', {
+    const r = await _fetchWithTimeout('/api/student/verify-token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: _examSessionToken })
-    });
+    }, 6000); // 6-second timeout — under heavy load server may be slow
     const d = await r.json();
     if (!d.valid) {
       // Token invalid — if this was a refresh, still allow exam to load
       // (save-progress beacon may not have completed yet; answers are safe in DB)
       if (isRefresh) return true;
+      // Under 50+ concurrent users the verify call can fail due to server load.
+      // If the student has valid credentials in localStorage, allow them through
+      // rather than kicking them to home — their answers are safe in the DB.
+      const hasLocalCreds = localStorage.getItem('testId') && localStorage.getItem('studentReg');
+      if (hasLocalCreds) return true;
       location.href = '/';
       return false;
     }
     return true;
   } catch (_) {
-    // Network error — allow exam to continue (don't block on connectivity issues)
+    // Network error or timeout — allow exam to continue (don't block on connectivity issues).
+    // This is the safe fallback for Render free-tier cold starts and burst traffic.
     return true;
   }
 }

@@ -18,9 +18,9 @@ app.use(express.json({ limit: '20mb' }));
 
 /* ─────────────── DATABASE ─────────────── */
 mongoose.connect(process.env.MONGO_URI, {
-  maxPoolSize: 10,
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000,
+  maxPoolSize: 50,
+  serverSelectionTimeoutMS: 10000,
+  socketTimeoutMS: 60000,
 })
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => { console.error('❌ MongoDB error:', err); process.exit(1); });
@@ -884,7 +884,12 @@ app.post('/api/student/issue-token', async (req, res) => {
     const { testId, studentReg, studentName } = req.body;
     if (!testId || !studentReg) return res.status(400).json({ message: 'Missing fields' });
     const token = crypto.randomBytes(24).toString('hex');
-    await Session.create({ token, testId, studentReg, studentName: studentName || '' });
+    // Use upsert so 50+ concurrent students don't cause duplicate-key crashes
+    await Session.findOneAndUpdate(
+      { testId, studentReg },
+      { $set: { token, studentName: studentName || '', createdAt: new Date() } },
+      { upsert: true, new: true }
+    );
     res.json({ token });
   } catch (err) {
     res.status(500).json({ message: 'Failed to issue token' });
