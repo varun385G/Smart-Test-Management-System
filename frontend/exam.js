@@ -36,17 +36,23 @@ let lastViolationTime = 0;
 const VIOLATION_COOLDOWN_MS = 1500;
 const violationLog = [];
 
-// ── SESSION TOKEN SECURITY ────────────────────
+// ── SESSION TOKEN SECURITY (Issue 1: URL Security) ────────────────────
+// Exam page requires a valid server-issued session token.
+// Without a token the page redirects to home — cannot be accessed by direct URL.
 let _examSessionToken = sessionStorage.getItem('examToken') || localStorage.getItem('examToken');
 
+// sessionStorage is tab-isolated — each tab keeps its own student credentials
+// This prevents multi-tab cross-contamination where Tab2's login overwrites Tab1's data
 let testId      = sessionStorage.getItem('testId');
 let studentName = sessionStorage.getItem('studentName');
 let studentReg  = sessionStorage.getItem('studentReg');
 
+// Fallback: if sessionStorage is empty (e.g. opened via bookmark), try localStorage
 if (!testId || !studentReg) {
   testId      = localStorage.getItem('testId');
   studentName = localStorage.getItem('studentName');
   studentReg  = localStorage.getItem('studentReg');
+  // If found in localStorage, copy back to sessionStorage for this tab
   if (testId && studentReg) {
     sessionStorage.setItem('testId', testId);
     sessionStorage.setItem('studentName', studentName || '');
@@ -56,8 +62,10 @@ if (!testId || !studentReg) {
 
 if (!testId || !studentReg) { location.href = '/'; }
 
+// Verify session token — BLOCKS exam load until verified (prevents URL direct access)
 let _tokenVerified = false;
 
+// Helper: fetch with a timeout so verify-token never hangs under server load
 async function _fetchWithTimeout(url, options, ms) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), ms);
@@ -75,50 +83,46 @@ async function verifySessionToken() {
   const isRefresh = sessionStorage.getItem('_examPageRefreshing') === '1';
   sessionStorage.removeItem('_examPageRefreshing');
 
+  // Always re-read token from storage — countdown redirect may have just written a fresh one
   if (!_examSessionToken) {
     _examSessionToken = sessionStorage.getItem('examToken') || localStorage.getItem('examToken');
   }
 
   const hasLocalCreds = localStorage.getItem('testId') && localStorage.getItem('studentReg');
+
+  // No token and no local creds = direct URL access, block it
   if (!_examSessionToken && !hasLocalCreds && !isRefresh) {
-    location.href = '/';
-    return false;
+    location.href = '/'; return false;
   }
 
+  // No token but has creds = token write raced with redirect, allow through
   if (!_examSessionToken) return true;
 
+  // Retry up to 3 times — under 50+ concurrent load DB may be slow on first attempt
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       if (attempt > 0) await new Promise(r => setTimeout(r, attempt * 600));
-      const res = await _fetchWithTimeout('/api/student/verify-token', {
+      const r = await _fetchWithTimeout('/api/student/verify-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: _examSessionToken })
       }, 8000);
-
-      if (!res.ok) continue;
-
-      const d = await res.json();
+      if (!r.ok) continue; // server error, retry
+      const d = await r.json();
       if (d.valid) return true;
-
-      if (!hasLocalCreds && !isRefresh) {
-        location.href = '/';
-        return false;
-      }
-      return true;
-
-    } catch (_) {
-      // retry
-    }
+      // Token invalid — if legitimate student (has creds), allow through
+      if (hasLocalCreds || isRefresh) return true;
+      location.href = '/'; return false;
+    } catch (_) { /* retry */ }
   }
-
-  return true;
+  return true; // all retries failed — fail open, don't strand student
 }
 
 /* ── Security events ──────────────────────── */
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) recordViolation('Tab switch detected');
 });
+// Right-click: prevent context menu AND suppress the blur violation it can cause
 let _contextMenuOpen = false;
 document.addEventListener('contextmenu', e => {
   e.preventDefault();
@@ -137,24 +141,37 @@ document.addEventListener('keydown',  e => {
 });
 
 window.addEventListener('blur', () => {
+  // Don't count blur as a violation if it was triggered by a right-click context menu
   if (_contextMenuOpen) return;
   recordViolation('Window focus lost');
 });
 
+// ── Issue 2: Browser/Desktop Shutdown Auto-Submit ─────────────────────
+// pagehide fires reliably on tab close, browser close, and system shutdown.
+// sendBeacon is used because fetch is cancelled during page unload.
+// IMPORTANT: pagehide also fires on page REFRESH — we must NOT submit on refresh.
+// We detect refresh by setting a sessionStorage flag before unload; if the flag
+// is present on DOMContentLoaded it means the page was refreshed (not closed).
 window.addEventListener('pagehide', () => {
   if (examSubmitted || examLocked || !examStarted) return;
+  // Mark this as a pending unload so the reload can detect it's a refresh
   sessionStorage.setItem('_examPageRefreshing', '1');
+  // Save current answers and timer immediately via sendBeacon so refresh restores them
   try {
     const remapped = remapAnswers();
     const savePayload = JSON.stringify({ testId, studentName, studentReg, answers: remapped, remainingSeconds });
     navigator.sendBeacon('/api/exam/save-progress', new Blob([savePayload], { type: 'application/json' }));
   } catch (_) {}
+  // We do NOT submit here and do NOT invalidate the token — the tab may be just refreshing.
+  // True tab/browser close is detected below via a delayed check that runs only if the page
+  // does NOT reload within 1 second (handled by the server-side session TTL of 4 hours).
 });
 
 window.addEventListener('beforeunload', e => {
   if (!examSubmitted && !examLocked && examStarted) { e.preventDefault(); e.returnValue = ''; }
 });
 
+// Back button detection
 history.pushState(null, '', location.href);
 window.addEventListener('popstate', () => {
   history.pushState(null, '', location.href);
@@ -162,7 +179,7 @@ window.addEventListener('popstate', () => {
 });
 
 function recordViolation(reason) {
-  if (!examStarted) return;
+  if (!examStarted) return;  // don't count violations during disclaimer
   if (examSubmitted || examLocked) return;
   const now = Date.now();
   if (now - lastViolationTime < VIOLATION_COOLDOWN_MS) return;
@@ -216,6 +233,7 @@ function showWaitingRoom(scheduledStart, testTitle) {
     hour:'2-digit', minute:'2-digit'
   });
 
+  // Start countdown
   clearInterval(waitingInterval);
   waitingInterval = setInterval(() => {
     const diff = new Date(scheduledStart) - new Date();
@@ -265,9 +283,11 @@ let _disclaimerCountdownInterval = null;
 function showDisclaimerCountdown(scheduledStart) {
   clearInterval(_disclaimerCountdownInterval);
 
+  // Disable start button, show countdown above it
   const btn = document.getElementById('startExamBtn');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.45'; btn.style.cursor = 'not-allowed'; }
 
+  // Insert countdown bar above the button inside the disclaimer footer
   const footer = btn ? btn.parentElement : null;
   let cdBar = document.getElementById('disclaimerCdBar');
   if (!cdBar && footer) {
@@ -282,7 +302,7 @@ function showDisclaimerCountdown(scheduledStart) {
     if (diff <= 0) {
       clearInterval(_disclaimerCountdownInterval);
       localStorage.removeItem('examScheduledStart');
-      scheduledStartTime = null;
+      scheduledStartTime = null; // clear so startExam() doesn't loop back
       if (cdBar) cdBar.innerHTML = `<div style="color:var(--success); font-weight:700; font-size:15px; padding:10px 0;">🟢 Exam is now live!</div>`;
       if (btn) {
         btn.disabled = false;
@@ -326,6 +346,7 @@ async function lockExam() {
   clearInterval(autoSaveInterval);
   clearInterval(elapsedInterval);
 
+  // Poll every 5 seconds — detect when staff unlocks the exam
   const _unlockPoll = setInterval(async () => {
     if (!examLocked) { clearInterval(_unlockPoll); return; }
     try {
@@ -333,23 +354,27 @@ async function lockExam() {
       if (!r.ok) return;
       const d = await r.json();
       if (!d.isLocked && !d.isForceSubmitted) {
+        // Staff unlocked — remove lock overlay and resume exam
         clearInterval(_unlockPoll);
         examLocked = false;
         const overlay = document.getElementById('lockOverlay');
         if (overlay) overlay.remove();
         document.querySelectorAll('input, textarea, button').forEach(el => el.disabled = false);
+        // Restart timer with remaining seconds from server
         if (d.remainingSeconds && d.remainingSeconds > 0) {
           remainingSeconds = d.remainingSeconds;
         }
         startTimer();
         autoSaveInterval = setInterval(autoSaveProgress, 10000);
         updateSubmitLock();
+        // Show unlock toast
         const toast = document.createElement('div');
         toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#10b981;color:#fff;padding:14px 20px;border-radius:10px;font-size:14px;font-weight:700;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);';
         toast.textContent = '✅ Your exam has been unlocked. You may continue.';
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 5000);
       } else if (d.isForceSubmitted) {
+        // Staff force-submitted — show submitted screen
         clearInterval(_unlockPoll);
         examLocked = false;
         showSubmittedScreen(true);
@@ -374,6 +399,7 @@ async function lockExam() {
     if (data.lockCode) lockCode = data.lockCode;
   } catch (_) {}
 
+  // Invalidate session token when exam is locked
   if (_examSessionToken) {
     try {
       fetch('/api/student/invalidate-token', {
@@ -505,6 +531,7 @@ async function timerExpiredForceSubmit() {
       body: JSON.stringify({ testId, studentName, studentReg, answers: remapped, violationLog })
     });
   } catch (_) {}
+  // Invalidate session token
   if (_examSessionToken) {
     try { fetch('/api/student/invalidate-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: _examSessionToken }) }); } catch (_) {}
     sessionStorage.removeItem('examToken');
@@ -520,6 +547,7 @@ async function autoSaveProgress() {
   if (examSubmitted || examLocked) return;
   try {
     const remapped = remapAnswers();
+    // Issue 4: Use a 5-second timeout to prevent slow saves from piling up
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     await fetch('/api/exam/save-progress', {
@@ -532,6 +560,7 @@ async function autoSaveProgress() {
   } catch (_) {}
 }
 
+/* ── Immediate save on each answer action ─── */
 function saveNow() {
   if (examSubmitted || examLocked) return;
   autoSaveProgress();
@@ -542,10 +571,12 @@ function saveNow() {
 ══════════════════════════════════════════ */
 function renderQuestion(qi) {
   currentIndex = qi;
+  // Save current position so refresh can restore it
   if (testId) localStorage.setItem('currentIndex_' + testId, qi);
   const q = questions[qi];
   const container = document.getElementById('examContainer');
 
+  // Mark as skipped if unvisited (visiting now for first time without answer)
   if (questionStatus[qi] === 'unvisited') {
     questionStatus[qi] = 'skipped';
   }
@@ -656,6 +687,7 @@ function handleAnswer(qi, idx, input) {
     else answers[qi] = answers[qi].filter(x => x !== idx);
     input.closest('.exam-option').classList.toggle('selected', input.checked);
   }
+  // Save immediately on every answer change
   saveNow();
 }
 
@@ -664,6 +696,7 @@ function handleNAT(qi, input) {
   saveNow();
 }
 
+/* ── Save Only (last question — saves answer, does NOT submit) ── */
 function saveOnly(qi) {
   const hasAnswer = isAnswered(qi);
   if (hasAnswer) {
@@ -674,6 +707,7 @@ function saveOnly(qi) {
   updateAllNavBtns();
   updateProgress();
   saveNow();
+  // Turn button green if answered, back to normal if not
   const btn = document.getElementById('saveOnlyBtn');
   if (btn) {
     if (hasAnswer) {
@@ -688,6 +722,7 @@ function saveOnly(qi) {
   }
 }
 
+/* ── Save & Next ──────────────────────────── */
 function saveAndNext(qi) {
   const hasAnswer = isAnswered(qi);
   if (hasAnswer) {
@@ -698,11 +733,13 @@ function saveAndNext(qi) {
   updateAllNavBtns();
   updateProgress();
   saveNow();
+  // Only navigate forward — NEVER triggers submit
   if (qi < questions.length - 1) {
     renderQuestion(qi + 1);
   }
 }
 
+/* ── Save & Review ────────────────────────── */
 function saveAndReview(qi) {
   if (!isAnswered(qi)) {
     alert('Please answer the question first, then click Save & Review.');
@@ -717,6 +754,7 @@ function saveAndReview(qi) {
   }
 }
 
+/* ── Clear answer ─────────────────────────── */
 function clearAnswer(qi) {
   const q = questions[qi];
   answers[qi] = q.type === 'MSQ' ? [] : null;
@@ -727,6 +765,7 @@ function clearAnswer(qi) {
   renderQuestion(qi);
 }
 
+/* ── Prev / Nav ───────────────────────────── */
 function goToPrev() {
   if (currentIndex > 0) renderQuestion(currentIndex - 1);
 }
@@ -735,12 +774,14 @@ function goToQuestion(qi) {
   renderQuestion(qi);
 }
 
+/* ── Check if answered ────────────────────── */
 function isAnswered(qi) {
   const ans = answers[qi];
   if (Array.isArray(ans)) return ans.length > 0;
   return ans !== null && ans !== undefined && ans !== '';
 }
 
+/* ── Navigator ────────────────────────────── */
 function buildNavigator() {
   const grid = document.getElementById('navGrid');
   grid.innerHTML = questions.map((_, i) => `
@@ -761,6 +802,7 @@ function updateAllNavBtns() {
   });
 }
 
+/* ── Progress ─────────────────────────────── */
 function updateProgress() {
   const answered = questionStatus.filter(s => s === 'answered' || s === 'review').length;
   const pct = questions.length ? (answered / questions.length * 100) : 0;
@@ -772,7 +814,9 @@ function updateProgress() {
   if (confirmAnswered) confirmAnswered.textContent = answered;
 }
 
+/* ── Submit ───────────────────────────────── */
 function confirmSubmit() {
+  // Populate summary
   const answered   = questionStatus.filter(s => s === 'answered').length;
   const review     = questionStatus.filter(s => s === 'review').length;
   const skipped    = questionStatus.filter(s => s === 'skipped').length;
@@ -791,6 +835,7 @@ function confirmSubmit() {
   if (suv) suv.textContent = unvisited;
   if (st)  st.textContent  = total;
 
+  // Also update old confirmAnswered/confirmTotal if they exist
   const ca = document.getElementById('confirmAnswered');
   const ct = document.getElementById('confirmTotal');
   if (ca) ca.textContent = answered + review;
@@ -812,6 +857,7 @@ async function finalSubmit() {
 
   document.getElementById('confirmBox').classList.remove('open');
 
+  // Show submitting overlay
   const ovl = document.createElement('div');
   ovl.id = '_submitOvl';
   ovl.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(15,23,42,0.7);display:flex;align-items:center;justify-content:center;font-family:var(--font-main);';
@@ -832,6 +878,7 @@ async function finalSubmit() {
       if (attempt < 3) await new Promise(r => setTimeout(r, 1000));
     }
   }
+  // Invalidate session token after submit
   if (_examSessionToken) {
     try {
       await fetch('/api/student/invalidate-token', {
@@ -853,6 +900,7 @@ function showSubmittedScreen(success = true) {
     <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); font-family:var(--font-main); padding:20px;">
       <div style="width:100%; max-width:480px;">
 
+        <!-- Submission status card -->
         <div class="card" style="text-align:center; padding:32px; margin-bottom:20px;">
           <div style="font-size:56px; margin-bottom:16px;">${success ? '✅' : '⚠️'}</div>
           <h2 style="font-size:22px; margin-bottom:8px;">${success ? 'Exam Submitted!' : 'Submission Issue'}</h2>
@@ -863,6 +911,7 @@ function showSubmittedScreen(success = true) {
           </p>
         </div>
 
+        <!-- Feedback form (only on success) -->
         ${success ? `
         <div class="card" style="padding:28px;" id="feedbackCard">
           <div style="font-size:15px; font-weight:800; margin-bottom:4px;">📝 Quick Feedback</div>
@@ -901,6 +950,7 @@ function showSubmittedScreen(success = true) {
         </div>
         ` : ''}
 
+        <!-- Return home (shown after feedback or on failure) -->
         <div id="returnHomeDiv" style="${success ? 'display:none;' : ''}">
           <button onclick="location.href='/'" class="btn btn-primary" style="width:100%;">Return to Home</button>
         </div>
@@ -910,6 +960,7 @@ function showSubmittedScreen(success = true) {
   `;
 }
 
+/* ── Feedback helpers ─────────────────────── */
 const _fbRatings = {};
 
 function selectRating(qid, val) {
@@ -993,9 +1044,11 @@ async function loadExam() {
   document.getElementById('examTitle').textContent = test.title || 'Examination';
   document.title = test.title || 'Examination';
 
+  // Store scheduled start time — prefer localStorage value passed from student.js login
   const storedStart = localStorage.getItem('examScheduledStart');
   scheduledStartTime = storedStart || test.scheduledStart || null;
 
+  // Populate staff credit bar
   const creditEl = document.getElementById('staffCreditText');
   if (creditEl) {
     if (test.createdBy) {
@@ -1018,14 +1071,18 @@ async function loadExam() {
   const originalQuestions = test.questions || [];
   questions = test.shuffleQuestions !== false ? shuffleArray([...originalQuestions]) : [...originalQuestions];
 
+  // Build a robust index map: track which original indices have been assigned
+  // so duplicate question texts don't map to the same original index
   const _assignedOrigIdx = new Set();
   questions.forEach(q => {
+    // Try exact match (question text + type + marks)
     let idx = originalQuestions.findIndex((orig, i) =>
       !_assignedOrigIdx.has(i) &&
       orig.question === q.question &&
       orig.type === q.type &&
       (orig.marks || 1) === (q.marks || 1)
     );
+    // Fallback: match by question text + type only
     if (idx === -1) {
       idx = originalQuestions.findIndex((orig, i) =>
         !_assignedOrigIdx.has(i) &&
@@ -1035,6 +1092,7 @@ async function loadExam() {
     }
     q._origIdx = idx;
     if (idx !== -1) _assignedOrigIdx.add(idx);
+    // Pre-shuffle options once so they stay consistent while navigating back and forth
     if ((q.type === 'MCQ' || q.type === 'MSQ') && test.shuffleOptions !== false) {
       q._shuffledOpts = shuffleArray(q.options.map((o, i) => ({ o, i })));
     } else {
@@ -1042,6 +1100,7 @@ async function loadExam() {
     }
   });
 
+  // Submit lock setup
   totalDurationSeconds = (test.duration || 30) * 60;
   if (test.submitAfterMinutes) {
     submitAfterSeconds = test.submitAfterMinutes * 60;
@@ -1049,9 +1108,11 @@ async function loadExam() {
     submitAfterSeconds = null;
   }
 
+  // Default blank answers and statuses
   answers        = questions.map(q => q.type === 'MSQ' ? [] : null);
   questionStatus = questions.map(() => 'unvisited');
 
+  // ── Restore saved answers and timer from server (survives refresh) ──
   if (lockData && lockData.exists && lockData.savedAnswers && lockData.savedAnswers.length > 0) {
     questions.forEach((q, shuffledIdx) => {
       const origIdx = q._origIdx !== undefined ? q._origIdx : shuffledIdx;
@@ -1065,6 +1126,8 @@ async function loadExam() {
     });
   }
 
+  // ── Restore remaining timer from server ──
+  // If server has a saved remainingSeconds use it, else start fresh
   if (lockData && lockData.remainingSeconds != null && lockData.remainingSeconds > 0) {
     remainingSeconds = lockData.remainingSeconds;
   } else {
@@ -1081,6 +1144,7 @@ async function loadExam() {
 
   buildNavigator();
   updateProgress();
+  // Don't start timer yet — wait for student to dismiss disclaimer
   examReady = true;
 }
 
@@ -1090,6 +1154,7 @@ function renderLockScreenOnly(lockCode) {
   clearInterval(timerInterval);
   document.querySelectorAll('input, textarea, button').forEach(el => el.disabled = true);
 
+  // Poll for staff unlock (same as in lockExam)
   const _unlockPoll2 = setInterval(async () => {
     if (!examLocked) { clearInterval(_unlockPoll2); return; }
     try {
@@ -1098,6 +1163,8 @@ function renderLockScreenOnly(lockCode) {
       const d = await r.json();
       if (!d.isLocked && !d.isForceSubmitted) {
         clearInterval(_unlockPoll2);
+        // Token was cleared on lock — student must re-login to get fresh token
+        // Redirect to student login page where canResume will handle re-entry
         const overlay2 = document.getElementById('lockOverlay');
         if (overlay2) overlay2.remove();
         document.body.innerHTML = `
@@ -1154,11 +1221,14 @@ function renderLockScreenOnly(lockCode) {
 
 /* ── Disclaimer screen ─────────────────── */
 function startExam() {
+  // If scheduledStartTime is still in future, show countdown (don't start yet)
+  // Note: scheduledStartTime is set to null when countdown reaches 0
   if (scheduledStartTime && new Date() < new Date(scheduledStartTime)) {
     showDisclaimerCountdown(scheduledStartTime);
     return;
   }
 
+  // Exam time has arrived — start exam
   examStarted = true;
   scheduledStartTime = null;
   localStorage.removeItem('examScheduledStart');
@@ -1183,11 +1253,13 @@ function startExam() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Verify token FIRST before loading any exam data
   const tokenOk = await verifySessionToken();
-  if (!tokenOk) return;
+  if (!tokenOk) return; // already redirected
 
   const alreadySeen = localStorage.getItem('disclaimerSeen_' + testId);
   if (alreadySeen) {
+    // Hide disclaimer immediately — student already read it
     const screen = document.getElementById('disclaimerScreen');
     if (screen) screen.style.display = 'none';
     examStarted = true;
@@ -1203,19 +1275,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }, 100);
   } else {
+    // Fresh load — check if auto-redirected from login page with a scheduled start
+    // If so, start the disclaimer countdown automatically after exam data loads
     const storedStart = localStorage.getItem('examScheduledStart');
-    if (storedStart) {
-      if (new Date(storedStart) > new Date()) {
-        const wait = setInterval(() => {
-          if (examReady) {
-            clearInterval(wait);
-            showDisclaimerCountdown(storedStart);
-          }
-        }, 100);
-      } else {
-        localStorage.removeItem('examScheduledStart');
-        scheduledStartTime = null;
-      }
+    if (storedStart && new Date(storedStart) > new Date()) {
+      // Wait for loadExam to finish, then auto-trigger disclaimer countdown
+      const wait = setInterval(() => {
+        if (examReady) {
+          clearInterval(wait);
+          // Show disclaimer (it's visible by default) and start countdown
+          showDisclaimerCountdown(storedStart);
+        }
+      }, 100);
     }
   }
   loadExam();

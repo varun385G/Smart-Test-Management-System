@@ -26,6 +26,7 @@ mongoose.connect(process.env.MONGO_URI, {
   .catch(err => { console.error('❌ MongoDB error:', err); process.exit(1); });
 
 /* ─────────────── SESSION MODEL ─────────────── */
+// Stored in MongoDB so tokens survive Render restarts / spin-down
 const sessionSchema = new mongoose.Schema({
   token:       { type: String, required: true, unique: true, index: true },
   testId:      { type: String, index: true },
@@ -33,7 +34,7 @@ const sessionSchema = new mongoose.Schema({
   studentName: { type: String, default: '' },
   createdAt:   { type: Date, default: Date.now, expires: 14400 }
 });
-// Compound index for fast upsert lookups under concurrent load (50+ students at once)
+// Compound index for fast upsert lookups under 50+ concurrent students
 sessionSchema.index({ testId: 1, studentReg: 1 }, { unique: true });
 const Session = mongoose.models.Session || mongoose.model('Session', sessionSchema);
 
@@ -276,62 +277,64 @@ app.post('/api/tests/:testId/publish-results', async (req, res) => {
 /* ─────────────── STUDENT VALIDATE ─────────────── */
 app.post('/api/student/validate', async (req, res) => {
   try {
-    const { testId, password, reg } = req.body;
-    const test = await Test.findOne({ testId });
-    if (!test) return res.status(404).json({ message: 'Test not found' });
-    if (test.password !== password) return res.status(401).json({ message: 'Invalid password' });
+  const { testId, password, reg } = req.body;
+  const test = await Test.findOne({ testId });
+  if (!test) return res.status(404).json({ message: 'Test not found' });
+  if (test.password !== password) return res.status(401).json({ message: 'Invalid password' });
 
-    const existing = await Result.findOne({ testId, studentReg: reg });
-    if (existing) {
-      if (existing.isLocked) {
-        return res.json({
-          attempted: true,
-          isLocked: true,
-          lockCode: existing.lockCode,
-          violationLog: existing.violationLog || [],
-          resultsPublished: test.resultsPublished
-        });
-      }
-      // Student has fully submitted if total > 0 (normal submission) or isForceSubmitted
-      const fullySubmitted = existing.isForceSubmitted || (existing.total > 0);
-      if (fullySubmitted) {
-        return res.json({
-          attempted: true,
-          isLocked: false,
-          isForceSubmitted: existing.isForceSubmitted || false,
-          resultsPublished: test.resultsPublished
-        });
-      }
-      // Not fully submitted — exam was in progress, allow resume
+  const existing = await Result.findOne({ testId, studentReg: reg });
+  if (existing) {
+    if (existing.isLocked) {
       return res.json({
-        attempted: false,
-        canResume: true,
-        scheduledStart: test.scheduledStart || null
+        attempted: true,
+        isLocked: true,
+        lockCode: existing.lockCode,
+        violationLog: existing.violationLog || [],
+        resultsPublished: test.resultsPublished
       });
     }
-
-    const now = new Date();
-    if (test.scheduledStart && now < test.scheduledStart) {
-      const minsUntilStart = (new Date(test.scheduledStart) - now) / 60000;
-      if (minsUntilStart > 2) {
-        return res.status(403).json({
-          message: 'Exam has not started yet. Scheduled start: ' + new Date(test.scheduledStart).toLocaleString(),
-          scheduledStart: test.scheduledStart,
-          minsUntilStart: Math.ceil(minsUntilStart)
-        });
-      }
-    }
-    if (test.scheduledEnd && now > test.scheduledEnd) {
-      return res.status(403).json({
-        message: 'Exam window has ended. It ended at: ' + new Date(test.scheduledEnd).toLocaleString(),
-        scheduledEnd: test.scheduledEnd
+    // Student has fully submitted if total > 0 and not locked (normal submission)
+    // or if isForceSubmitted is true
+    const fullySubmitted = existing.isForceSubmitted || (existing.total > 0);
+    if (fullySubmitted) {
+      return res.json({
+        attempted: true,
+        isLocked: false,
+        isForceSubmitted: existing.isForceSubmitted || false,
+        resultsPublished: test.resultsPublished
       });
     }
-
-    res.json({
+    // Not fully submitted — exam was in progress (save-progress created the record)
+    // Allow resume
+    return res.json({
       attempted: false,
+      canResume: true,
       scheduledStart: test.scheduledStart || null
     });
+  }
+
+  const now = new Date();
+  if (test.scheduledStart && now < test.scheduledStart) {
+    const minsUntilStart = (new Date(test.scheduledStart) - now) / 60000;
+    if (minsUntilStart > 2) {
+      return res.status(403).json({
+        message: 'Exam has not started yet. Scheduled start: ' + new Date(test.scheduledStart).toLocaleString(),
+        scheduledStart: test.scheduledStart,
+        minsUntilStart: Math.ceil(minsUntilStart)
+      });
+    }
+  }
+  if (test.scheduledEnd && now > test.scheduledEnd) {
+    return res.status(403).json({
+      message: 'Exam window has ended. It ended at: ' + new Date(test.scheduledEnd).toLocaleString(),
+      scheduledEnd: test.scheduledEnd
+    });
+  }
+
+  res.json({
+    attempted: false,
+    scheduledStart: test.scheduledStart || null
+  });
   } catch (err) {
     res.status(500).json({ message: 'Validation failed. Please try again.' });
   }
@@ -431,6 +434,7 @@ app.post('/api/exam/submit', async (req, res) => {
     if (existing && existing.isForceSubmitted) {
       return res.json({ message: 'Already force-submitted', score: existing.score, total: existing.total });
     }
+    // Block re-submission if already scored normally (total > 0 and not locked)
     if (existing && !existing.isLocked && existing.total > 0) {
       return res.json({ message: 'Already submitted', score: existing.score, total: existing.total });
     }
@@ -489,6 +493,7 @@ app.post('/api/exam/lock', async (req, res) => {
     res.json({ message: 'Locked', lockCode });
   } catch (err) {
     if (err.code === 11000) {
+      // Race condition — already locked by a concurrent request, that's fine
       return res.json({ message: 'Locked', lockCode: '' });
     }
     console.error('LOCK ERROR:', err);
@@ -877,11 +882,14 @@ app.get('/api/feedback/:testId', async (req, res) => {
 });
 
 /* ─────────────── SESSION TOKEN MANAGEMENT ─────────────── */
+// Stored in MongoDB so tokens survive Render restarts / spin-down
+
 app.post('/api/student/issue-token', async (req, res) => {
   try {
     const { testId, studentReg, studentName } = req.body;
     if (!testId || !studentReg) return res.status(400).json({ message: 'Missing fields' });
     const token = crypto.randomBytes(24).toString('hex');
+    // Use upsert so 50+ concurrent students don't cause duplicate-key crashes
     await Session.findOneAndUpdate(
       { testId, studentReg },
       { $set: { token, studentName: studentName || '', createdAt: new Date() } },
@@ -954,7 +962,7 @@ if (RENDER_EXTERNAL_URL) {
       const req  = mod.get(url, () => {});
       req.on('error', () => {});
     } catch (_) {}
-  }, 10 * 60 * 1000);
+  }, 10 * 60 * 1000); // ping every 10 minutes
 }
 
 /* ─────────────── FRONTEND ─────────────── */
