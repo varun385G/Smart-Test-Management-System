@@ -34,7 +34,6 @@ async function handleSubmit() {
         return;
       }
       if (res.status === 403 && data.scheduledEnd) {
-        // Issue 5 fix: if window just closed within 90s, student validated in time but server was slow (50+ concurrent users)
         const endedSecondsAgo = (new Date() - new Date(data.scheduledEnd)) / 1000;
         if (endedSecondsAgo <= 90) {
           sessionStorage.setItem('testId', testId);
@@ -67,8 +66,6 @@ async function handleSubmit() {
       return;
     }
 
-    // ── UNLOCKED RESUME: staff unlocked after malpractice ──────────
-    // canResume=true means exam was in progress and staff allowed student back in
     if (data.canResume) {
       sessionStorage.setItem('testId', testId);
       sessionStorage.setItem('studentName', name);
@@ -77,7 +74,6 @@ async function handleSubmit() {
       localStorage.setItem('studentName', name);
       localStorage.setItem('studentReg', reg);
       localStorage.removeItem('examScheduledStart');
-      // Issue a fresh token for re-entry
       try {
         const tokenRes = await fetch('/api/student/issue-token', {
           method: 'POST',
@@ -101,7 +97,6 @@ async function handleSubmit() {
     }
 
     if (data.attempted) {
-      // ── LOCKED: show invigilator screen ──────────────────────────
       if (data.isLocked) {
         const violationRows = (data.violationLog || []).map((v, i) => `
           <div style="font-size:12.5px; color:#7f1d1d; padding:4px 0; border-bottom:1px solid #fecaca; display:flex; justify-content:space-between;">
@@ -131,7 +126,6 @@ async function handleSubmit() {
         return;
       }
 
-      // ── FORCE SUBMITTED by staff ──────────────────────────────────
       if (data.isForceSubmitted) {
         msgBox.innerHTML = `
           <div class="card" style="border:2px solid #f59e0b; padding:24px; text-align:center;">
@@ -155,7 +149,6 @@ async function handleSubmit() {
         return;
       }
 
-      // ── ATTEMPTED normally (not locked, not force-submitted) ──────
       if (data.resultsPublished) {
         msgBox.innerHTML = `
           <div class="card" style="text-align:center; padding:20px; border-color:var(--success);">
@@ -182,8 +175,6 @@ async function handleSubmit() {
       return;
     }
 
-    // ── Fresh attempt ────────────────────────────────────────────
-    // Store in BOTH sessionStorage (tab-isolated, primary) and localStorage (fallback for refresh)
     sessionStorage.setItem('testId', testId);
     sessionStorage.setItem('studentName', name);
     sessionStorage.setItem('studentReg', reg);
@@ -191,8 +182,6 @@ async function handleSubmit() {
     localStorage.setItem('studentName', name);
     localStorage.setItem('studentReg', reg);
 
-    // ── Issue 1: Issue a server session token so exam.html can't be opened by direct URL ──
-    // This runs in parallel — non-blocking. Token is stored before redirect.
     try {
       const tokenRes = await fetch('/api/student/issue-token', {
         method: 'POST',
@@ -204,14 +193,11 @@ async function handleSubmit() {
         sessionStorage.setItem('examToken', tokenData.token);
         localStorage.setItem('examToken', tokenData.token);
       }
-    } catch (_) { /* non-critical — exam still loads but URL direct-access blocked */ }
+    } catch (_) {}
 
-    // If scheduledStart is still more than 2 mins away — show countdown on login page
-    // Auto-redirect happens when 2-min mark is reached (disclaimer shows those 2 mins)
     if (data.scheduledStart) {
       const minsLeft = (new Date(data.scheduledStart) - new Date()) / 60000;
       if (minsLeft > 0) {
-        // Any future time — show countdown (auto-redirects at 2-min mark)
         showNotStartedCountdown(data.scheduledStart);
         return;
       }
@@ -232,11 +218,8 @@ function viewResult(testId, reg) {
   location.href = `/student-result.html?testId=${testId}&reg=${reg}`;
 }
 
-// Allow Enter key
 document.addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
-/* ── Not-started countdown (shown when > 7 mins away) ── */
 
-/* ── Pre-exam countdown on login page (credentials verified, waiting for start time) ── */
 let _preExamInterval = null;
 
 function showPreExamCountdown(scheduledStart) {
@@ -254,7 +237,6 @@ function showPreExamCountdown(scheduledStart) {
     const diff = new Date(scheduledStart) - new Date();
 
     if (diff <= 0) {
-      // Time is up — redirect to exam page now
       clearInterval(_preExamInterval);
       msgBoxEl().innerHTML = `
         <div class="card" style="text-align:center; padding:20px; border-color:var(--success); border-width:2px;">
@@ -263,7 +245,7 @@ function showPreExamCountdown(scheduledStart) {
           <div style="color:var(--muted); font-size:13px;">Taking you to the exam now…</div>
         </div>`;
       _ensureSessionCreds();
-      setTimeout(() => { location.href = '/exam.html'; }, 1200);
+      _reissueTokenAndRedirect();
       return;
     }
 
@@ -272,7 +254,6 @@ function showPreExamCountdown(scheduledStart) {
     const mm = Math.floor((totalSecs % 3600) / 60);
     const ss = totalSecs % 60;
 
-    // Update only numbers if already rendered
     const phaseEl = document.getElementById('_prePhase');
     if (phaseEl) {
       const hhEl = document.getElementById('_preHH');
@@ -284,7 +265,6 @@ function showPreExamCountdown(scheduledStart) {
       return;
     }
 
-    // First render
     const hoursBlock = hh > 0 ? `
       <div style="background:var(--bg); border:1.5px solid var(--border); border-radius:10px; padding:10px 16px; min-width:60px; text-align:center;">
         <div style="font-size:26px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1;" id="_preHH">${pad(hh)}</div>
@@ -294,17 +274,14 @@ function showPreExamCountdown(scheduledStart) {
 
     msgBoxEl().innerHTML = `
       <div class="card" style="padding:24px; text-align:center; border-color:#4f46e5; border-width:2px;">
-
         <div style="display:inline-flex; align-items:center; gap:8px; background:#ede9fe; border-radius:20px; padding:6px 14px; margin-bottom:14px;">
           <span style="font-size:16px;">✅</span>
           <span style="font-size:13px; font-weight:700; color:#4f46e5;">Credentials Verified</span>
         </div>
-
         <div style="font-weight:800; font-size:16px; margin-bottom:4px;">Exam Starts In</div>
         <div style="color:var(--muted); font-size:12.5px; margin-bottom:18px;">
           Scheduled: <strong>${startStr}</strong>
         </div>
-
         <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-bottom:16px;">
           ${hoursBlock}
           <div style="background:var(--bg); border:1.5px solid var(--border); border-radius:10px; padding:10px 16px; min-width:60px; text-align:center;">
@@ -317,7 +294,6 @@ function showPreExamCountdown(scheduledStart) {
             <div style="font-size:9px; color:var(--muted); text-transform:uppercase; margin-top:2px;">Sec</div>
           </div>
         </div>
-
         <div id="_prePhase" style="font-size:12px; color:var(--muted); line-height:1.6;">
           You will be automatically taken to the exam when the timer reaches zero.<br>
           Please keep this tab open and stay on this page.
@@ -336,13 +312,10 @@ function showNotStartedCountdown(scheduledStart) {
   const btn = document.getElementById('submitBtn');
   const pad = n => String(n).padStart(2, '0');
 
-  // Unlock = 2 mins before exam start (disclaimer shows for those 2 mins)
   const UNLOCK_MINS = 2;
   const unlockTime = new Date(new Date(scheduledStart) - UNLOCK_MINS * 60000);
   const startStr   = new Date(scheduledStart).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:true });
-  const unlockStr  = unlockTime.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:true });
 
-  // Disable button — student should NOT click, auto-redirect will happen
   if (btn) { btn.disabled = true; btn.textContent = 'Waiting…'; }
 
   function tick() {
@@ -351,21 +324,18 @@ function showNotStartedCountdown(scheduledStart) {
     const diffToStart   = new Date(scheduledStart) - now;
 
     if (diffToStart <= 0) {
-      // Exam already started — redirect now
       clearInterval(_notStartedInterval);
-      localStorage.setItem('examScheduledStart', scheduledStart);
       _ensureSessionCreds();
       msgBoxEl().innerHTML = `
         <div class="card" style="text-align:center; padding:16px; border-color:var(--success); border-width:2px;">
           <div style="font-size:28px; margin-bottom:6px;">🚀</div>
           <div style="font-weight:700; color:var(--success);">Exam has started! Redirecting…</div>
         </div>`;
-      setTimeout(() => { location.href = '/exam.html'; }, 800);
+      _reissueTokenAndRedirect();
       return;
     }
 
     if (diffToUnlock <= 0) {
-      // 2-min window reached — auto redirect to disclaimer page
       clearInterval(_notStartedInterval);
       localStorage.setItem('examScheduledStart', scheduledStart);
       _ensureSessionCreds();
@@ -375,17 +345,15 @@ function showNotStartedCountdown(scheduledStart) {
           <div style="font-weight:800; font-size:15px; color:#4f46e5; margin-bottom:4px;">Taking you to instructions…</div>
           <div style="color:var(--muted); font-size:13px;">Exam starts at <strong>${startStr}</strong></div>
         </div>`;
-      setTimeout(() => { location.href = '/exam.html'; }, 1000);
+      _reissueTokenAndRedirect();
       return;
     }
 
-    // Still in Phase 1 — count down to unlock time
     const totalSecs = Math.floor(diffToUnlock / 1000);
     const hh = Math.floor(totalSecs / 3600);
     const mm = Math.floor((totalSecs % 3600) / 60);
     const ss = totalSecs % 60;
 
-    // Update numbers only if already rendered
     const phaseEl = document.getElementById('_cdPhase');
     if (phaseEl && phaseEl.dataset.phase === '1') {
       if (hh > 0) { const el = document.getElementById('_preHH'); if (el) el.textContent = pad(hh); }
@@ -434,7 +402,7 @@ function showNotStartedCountdown(scheduledStart) {
 }
 
 function msgBoxEl() { return document.getElementById('messageBox'); }
-/* ── Ensure session credentials are set before redirecting ── */
+
 function _ensureSessionCreds() {
   const tid   = localStorage.getItem('testId');
   const name  = localStorage.getItem('studentName');
@@ -444,4 +412,25 @@ function _ensureSessionCreds() {
   if (name)  sessionStorage.setItem('studentName', name);
   if (reg)   sessionStorage.setItem('studentReg', reg);
   if (token) sessionStorage.setItem('examToken', token);
+}
+
+async function _reissueTokenAndRedirect() {
+  const tid  = localStorage.getItem('testId');
+  const reg  = localStorage.getItem('studentReg');
+  const name = localStorage.getItem('studentName') || '';
+  if (tid && reg) {
+    try {
+      const tokenRes = await fetch('/api/student/issue-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testId: tid, studentReg: reg, studentName: name })
+      });
+      if (tokenRes.ok) {
+        const tokenData = await tokenRes.json();
+        sessionStorage.setItem('examToken', tokenData.token);
+        localStorage.setItem('examToken', tokenData.token);
+      }
+    } catch (_) {}
+  }
+  location.href = '/exam.html';
 }

@@ -26,14 +26,15 @@ mongoose.connect(process.env.MONGO_URI, {
   .catch(err => { console.error('❌ MongoDB error:', err); process.exit(1); });
 
 /* ─────────────── SESSION MODEL ─────────────── */
-// Stored in MongoDB so tokens survive Render restarts / spin-down
 const sessionSchema = new mongoose.Schema({
   token:       { type: String, required: true, unique: true, index: true },
-  testId:      String,
+  testId:      { type: String, index: true },
   studentReg:  String,
   studentName: { type: String, default: '' },
   createdAt:   { type: Date, default: Date.now, expires: 14400 }
 });
+// Compound index for fast upsert lookups under concurrent load (50+ students at once)
+sessionSchema.index({ testId: 1, studentReg: 1 }, { unique: true });
 const Session = mongoose.models.Session || mongoose.model('Session', sessionSchema);
 
 /* ─────────────── HEALTH ─────────────── */
@@ -275,61 +276,62 @@ app.post('/api/tests/:testId/publish-results', async (req, res) => {
 /* ─────────────── STUDENT VALIDATE ─────────────── */
 app.post('/api/student/validate', async (req, res) => {
   try {
-  const { testId, password, reg } = req.body;
-  const test = await Test.findOne({ testId });
-  if (!test) return res.status(404).json({ message: 'Test not found' });
-  if (test.password !== password) return res.status(401).json({ message: 'Invalid password' });
+    const { testId, password, reg } = req.body;
+    const test = await Test.findOne({ testId });
+    if (!test) return res.status(404).json({ message: 'Test not found' });
+    if (test.password !== password) return res.status(401).json({ message: 'Invalid password' });
 
-  const existing = await Result.findOne({ testId, studentReg: reg });
-  if (existing) {
-    if (existing.isLocked) {
-      return res.json({
-        attempted: true,
-        isLocked: true,
-        lockCode: existing.lockCode,
-        violationLog: existing.violationLog || [],
-        resultsPublished: test.resultsPublished
-      });
-    }
-    const examInProgress = !existing.isForceSubmitted && (existing.score === 0 || existing.score === null || existing.score === undefined) && !existing.remainingSeconds;
-    const neverSubmitted = !existing.isForceSubmitted && (existing.total === 0 || existing.total === null || existing.total === undefined);
-    if (neverSubmitted || (examInProgress && existing.answers && existing.answers.length > 0)) {
+    const existing = await Result.findOne({ testId, studentReg: reg });
+    if (existing) {
+      if (existing.isLocked) {
+        return res.json({
+          attempted: true,
+          isLocked: true,
+          lockCode: existing.lockCode,
+          violationLog: existing.violationLog || [],
+          resultsPublished: test.resultsPublished
+        });
+      }
+      // Student has fully submitted if total > 0 (normal submission) or isForceSubmitted
+      const fullySubmitted = existing.isForceSubmitted || (existing.total > 0);
+      if (fullySubmitted) {
+        return res.json({
+          attempted: true,
+          isLocked: false,
+          isForceSubmitted: existing.isForceSubmitted || false,
+          resultsPublished: test.resultsPublished
+        });
+      }
+      // Not fully submitted — exam was in progress, allow resume
       return res.json({
         attempted: false,
         canResume: true,
         scheduledStart: test.scheduledStart || null
       });
     }
-    return res.json({
-      attempted: true,
-      isLocked: false,
-      isForceSubmitted: existing.isForceSubmitted || false,
-      resultsPublished: test.resultsPublished
-    });
-  }
 
-  const now = new Date();
-  if (test.scheduledStart && now < test.scheduledStart) {
-    const minsUntilStart = (new Date(test.scheduledStart) - now) / 60000;
-    if (minsUntilStart > 2) {
+    const now = new Date();
+    if (test.scheduledStart && now < test.scheduledStart) {
+      const minsUntilStart = (new Date(test.scheduledStart) - now) / 60000;
+      if (minsUntilStart > 2) {
+        return res.status(403).json({
+          message: 'Exam has not started yet. Scheduled start: ' + new Date(test.scheduledStart).toLocaleString(),
+          scheduledStart: test.scheduledStart,
+          minsUntilStart: Math.ceil(minsUntilStart)
+        });
+      }
+    }
+    if (test.scheduledEnd && now > test.scheduledEnd) {
       return res.status(403).json({
-        message: 'Exam has not started yet. Scheduled start: ' + new Date(test.scheduledStart).toLocaleString(),
-        scheduledStart: test.scheduledStart,
-        minsUntilStart: Math.ceil(minsUntilStart)
+        message: 'Exam window has ended. It ended at: ' + new Date(test.scheduledEnd).toLocaleString(),
+        scheduledEnd: test.scheduledEnd
       });
     }
-  }
-  if (test.scheduledEnd && now > test.scheduledEnd) {
-    return res.status(403).json({
-      message: 'Exam window has ended. It ended at: ' + new Date(test.scheduledEnd).toLocaleString(),
-      scheduledEnd: test.scheduledEnd
-    });
-  }
 
-  res.json({
-    attempted: false,
-    scheduledStart: test.scheduledStart || null
-  });
+    res.json({
+      attempted: false,
+      scheduledStart: test.scheduledStart || null
+    });
   } catch (err) {
     res.status(500).json({ message: 'Validation failed. Please try again.' });
   }
@@ -429,7 +431,6 @@ app.post('/api/exam/submit', async (req, res) => {
     if (existing && existing.isForceSubmitted) {
       return res.json({ message: 'Already force-submitted', score: existing.score, total: existing.total });
     }
-    // Block re-submission if already scored normally (total > 0 and not locked)
     if (existing && !existing.isLocked && existing.total > 0) {
       return res.json({ message: 'Already submitted', score: existing.score, total: existing.total });
     }
@@ -468,29 +469,28 @@ app.post('/api/exam/lock', async (req, res) => {
     const test = await Test.findOne({ testId });
     if (!test) return res.status(404).json({ message: 'Test not found' });
 
-    let existing = await Result.findOne({ testId, studentReg });
     const lockCode = crypto.randomBytes(4).toString('hex').toUpperCase();
 
-    if (existing) {
-      existing.violationLog = violationLog || [];
-      existing.isLocked = true;
-      existing.lockCode = lockCode;
-      existing.answers = (answers || []).map(a => Array.isArray(a) ? [...a] : a);
-      await existing.save();
-    } else {
-      await Result.create({
-        testId, studentName, studentReg,
-        answers: (answers || []).map(a => Array.isArray(a) ? [...a] : a),
-        score: 0, total: 0,
-        scoreBreakdown: [],
-        violationLog: violationLog || [],
-        isLocked: true,
-        lockCode
-      });
-    }
+    await Result.findOneAndUpdate(
+      { testId, studentReg },
+      {
+        $set: {
+          studentName: studentName || '',
+          answers: (answers || []).map(a => Array.isArray(a) ? [...a] : a),
+          violationLog: violationLog || [],
+          isLocked: true,
+          lockCode,
+        },
+        $setOnInsert: { score: 0, total: 0, scoreBreakdown: [] }
+      },
+      { upsert: true, new: true }
+    );
 
     res.json({ message: 'Locked', lockCode });
   } catch (err) {
+    if (err.code === 11000) {
+      return res.json({ message: 'Locked', lockCode: '' });
+    }
     console.error('LOCK ERROR:', err);
     res.status(500).json({ message: 'Lock failed' });
   }
@@ -877,14 +877,11 @@ app.get('/api/feedback/:testId', async (req, res) => {
 });
 
 /* ─────────────── SESSION TOKEN MANAGEMENT ─────────────── */
-// Stored in MongoDB so tokens survive Render restarts / spin-down
-
 app.post('/api/student/issue-token', async (req, res) => {
   try {
     const { testId, studentReg, studentName } = req.body;
     if (!testId || !studentReg) return res.status(400).json({ message: 'Missing fields' });
     const token = crypto.randomBytes(24).toString('hex');
-    // Use upsert so 50+ concurrent students don't cause duplicate-key crashes
     await Session.findOneAndUpdate(
       { testId, studentReg },
       { $set: { token, studentName: studentName || '', createdAt: new Date() } },
@@ -948,8 +945,15 @@ app.use((err, req, res, next) => {
 /* ─────────────── KEEP-ALIVE PING (Render free tier) ─────────────── */
 const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
 if (RENDER_EXTERNAL_URL) {
+  const https = require('https');
+  const http  = require('http');
   setInterval(() => {
-    fetch(RENDER_EXTERNAL_URL + '/api/health').catch(() => {});
+    try {
+      const url  = RENDER_EXTERNAL_URL + '/api/health';
+      const mod  = url.startsWith('https') ? https : http;
+      const req  = mod.get(url, () => {});
+      req.on('error', () => {});
+    } catch (_) {}
   }, 10 * 60 * 1000);
 }
 
