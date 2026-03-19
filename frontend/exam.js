@@ -80,42 +80,44 @@ async function _fetchWithTimeout(url, options, ms) {
 }
 
 async function verifySessionToken() {
+  // If this is a page refresh (pagehide set the flag), the token is still valid on the server.
+  // Skip the network check and let the exam reload — answers/timer will be restored from server.
   const isRefresh = sessionStorage.getItem('_examPageRefreshing') === '1';
-  sessionStorage.removeItem('_examPageRefreshing');
+  sessionStorage.removeItem('_examPageRefreshing'); // consume the flag immediately
 
-  // Always re-read token from storage — countdown redirect may have just written a fresh one
   if (!_examSessionToken) {
+    // No token at all — only block if it's NOT a refresh scenario
+    if (!isRefresh) { location.href = '/'; return false; }
+    // On refresh: token may still be in sessionStorage/localStorage from this tab
     _examSessionToken = sessionStorage.getItem('examToken') || localStorage.getItem('examToken');
+    if (!_examSessionToken) { location.href = '/'; return false; }
   }
 
-  const hasLocalCreds = localStorage.getItem('testId') && localStorage.getItem('studentReg');
-
-  // No token and no local creds = direct URL access, block it
-  if (!_examSessionToken && !hasLocalCreds && !isRefresh) {
-    location.href = '/'; return false;
+  try {
+    const r = await _fetchWithTimeout('/api/student/verify-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: _examSessionToken })
+    }, 6000); // 6-second timeout — under heavy load server may be slow
+    const d = await r.json();
+    if (!d.valid) {
+      // Token invalid — if this was a refresh, still allow exam to load
+      // (save-progress beacon may not have completed yet; answers are safe in DB)
+      if (isRefresh) return true;
+      // Under 50+ concurrent users the verify call can fail due to server load.
+      // If the student has valid credentials in localStorage, allow them through
+      // rather than kicking them to home — their answers are safe in the DB.
+      const hasLocalCreds = localStorage.getItem('testId') && localStorage.getItem('studentReg');
+      if (hasLocalCreds) return true;
+      location.href = '/';
+      return false;
+    }
+    return true;
+  } catch (_) {
+    // Network error or timeout — allow exam to continue (don't block on connectivity issues).
+    // This is the safe fallback for Render free-tier cold starts and burst traffic.
+    return true;
   }
-
-  // No token but has creds = token write raced with redirect, allow through
-  if (!_examSessionToken) return true;
-
-  // Retry up to 3 times — under 50+ concurrent load DB may be slow on first attempt
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      if (attempt > 0) await new Promise(r => setTimeout(r, attempt * 600));
-      const r = await _fetchWithTimeout('/api/student/verify-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: _examSessionToken })
-      }, 8000);
-      if (!r.ok) continue; // server error, retry
-      const d = await r.json();
-      if (d.valid) return true;
-      // Token invalid — if legitimate student (has creds), allow through
-      if (hasLocalCreds || isRefresh) return true;
-      location.href = '/'; return false;
-    } catch (_) { /* retry */ }
-  }
-  return true; // all retries failed — fail open, don't strand student
 }
 
 /* ── Security events ──────────────────────── */
